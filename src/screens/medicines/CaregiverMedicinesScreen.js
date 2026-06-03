@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, Button, Modal, StyleSheet } from 'react-native';
-import useStore from '../../store/useStore';
+import { useStore } from '../../store/useStore';
 
 const CaregiverMedicinesScreen = () => {
   const { medicines, fetchMedicines, addMedicine } = useStore();

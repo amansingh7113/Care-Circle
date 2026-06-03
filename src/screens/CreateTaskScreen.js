@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { createTask } from '../services/taskApi';
-import useStore from '../store/useStore';
+import { useStore } from '../store/useStore';
 
 const CreateTaskScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);

@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getMedicines, logAdministration } from '../services/medicineApi';
-import useStore from '../store/useStore';
+import { useStore } from '../store/useStore';
 
 const MedicineDashboardScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -22,7 +22,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       const data = await getMedicines(circleId);
       setMedicines(data.medicines || data || []);
     } catch (error) {
-      console.error('Failed to fetch medicines', error);
+      console.log('Failed to fetch medicines', error);
       // Fallback mock data for UI testing if API fails
       setMedicines([
         { id: '1', name: 'Amoxicillin', dosage: '500mg', time: '08:00 AM', status: 'pending' },
@@ -34,12 +34,13 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
   };
 
   const handleLog = async (id, status) => {
+    // Optimistic update
+    setMedicines(prev => prev.map(m => m.id === id ? { ...m, status } : m));
     try {
       await logAdministration(id, status);
       Alert.alert('Success', `Medicine marked as ${status}`);
-      fetchMedicines(); // Refresh list
     } catch (error) {
-      Alert.alert('Error', 'Failed to log administration');
+      console.log('Failed to log administration', error);
     }
   };
 
@@ -47,15 +48,23 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
     <View style={styles.card}>
       <View style={styles.cardInfo}>
         <Text style={styles.medName}>{item.name}</Text>
-        <Text style={styles.medDetails}>{item.dosage} at {item.time}</Text>
+        <Text style={styles.medDetails}>{item.dosage} at {item.time || (item.instructions?.scheduled_times ? item.instructions.scheduled_times.join(', ') : 'Scheduled')}</Text>
       </View>
       <View style={styles.actions}>
-        <TouchableOpacity style={[styles.actionBtn, styles.takenBtn]} onPress={() => handleLog(item.id, 'taken')}>
-          <Text style={styles.btnText}>Taken</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={() => handleLog(item.id, 'skipped')}>
-          <Text style={styles.btnText}>Skip</Text>
-        </TouchableOpacity>
+        {item.status === 'taken' || item.status === 'skipped' ? (
+          <Text style={[styles.btnText, { color: item.status === 'taken' ? '#34A853' : '#EA4335', padding: 8 }]}>
+            {item.status === 'taken' ? 'Taken' : 'Skipped'}
+          </Text>
+        ) : (
+          <>
+            <TouchableOpacity style={[styles.actionBtn, styles.takenBtn]} onPress={() => handleLog(item.id, 'taken')}>
+              <Text style={styles.btnText}>Taken</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={() => handleLog(item.id, 'skipped')}>
+              <Text style={styles.btnText}>Skip</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );

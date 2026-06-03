@@ -72,7 +72,7 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
     return res.status(403).json({ error: 'Unauthorized access to this circle' });
   }
 
-  const { data, error } = await supabase
+  const { data: medicines, error } = await supabase
     .from('medicines')
     .select('*')
     .eq('circle_id', circleId);
@@ -81,7 +81,28 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
     return res.status(400).json({ error: error.message });
   }
 
-  res.status(200).json(data);
+  // Fetch today's logs to determine status
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const { data: logs, error: logsError } = await supabase
+    .from('medicine_dose_logs')
+    .select('*')
+    .eq('circle_id', circleId)
+    .gte('taken_at', todayStart.toISOString())
+    .lte('taken_at', todayEnd.toISOString());
+
+  const medicinesWithStatus = medicines.map(med => {
+    const medLog = logs?.find(log => log.medicine_id === med.id);
+    return {
+      ...med,
+      status: medLog ? medLog.status : 'pending'
+    };
+  });
+
+  res.status(200).json(medicinesWithStatus);
 });
 
 // 3. POST /api/v1/medicines/:id/logs

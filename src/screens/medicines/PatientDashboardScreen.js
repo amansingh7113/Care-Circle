@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
-import useStore from '../../store/useStore';
+import { useStore } from '../../store/useStore';
 
 const PatientDashboardScreen = () => {
   const { pendingMedicines, fetchPendingMedicines, updateMedicineLog } = useStore();

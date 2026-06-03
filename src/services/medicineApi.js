@@ -9,6 +9,9 @@ const medicineApi = axios.create({
   baseURL: API_URL,
   headers: {
     'Bypass-Tunnel-Reminder': 'true',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0',
   },
 });
 

@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getUserCircles, createCircle, joinCircle } from '../services/circleApi';
+import { useStore } from '../store/useStore';
 
 const CircleSelectionScreen = ({ navigation }) => {
   const [circles, setCircles] = useState([]);
@@ -54,7 +55,10 @@ const CircleSelectionScreen = ({ navigation }) => {
   const renderCircleItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.circleCard} 
-      onPress={() => navigation.navigate('Dashboard', { circleId: item.id, circleName: item.name })}
+      onPress={() => {
+        useStore.getState().setCircle(item);
+        navigation.navigate('Dashboard', { circleId: item.id, circleName: item.name });
+      }}
     >
       <Text style={styles.circleName}>{item.name}</Text>
       <Text style={styles.circleRole}>{item.role}</Text>

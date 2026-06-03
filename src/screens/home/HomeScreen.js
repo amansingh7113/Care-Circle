@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import useStore from '../../store/useStore';
+import { useStore } from '../../store/useStore';
 import { getMedicines } from '../../services/medicineApi';
 import { getTasks } from '../../services/taskApi';
 import { getDoctorVisits } from '../../services/doctorVisitApi';

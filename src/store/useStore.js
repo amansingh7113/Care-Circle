@@ -11,7 +11,7 @@ export const useStore = create(
       dailyTasks: [],
 
       setSession: (session) => set({ userSession: session }),
-      clearSession: () => set({ userSession: null }),
+      clearSession: () => set({ userSession: null, currentCircle: null, medicinesList: [], dailyTasks: [] }),
       setCircle: (circle) => set({ currentCircle: circle }),
       setMedicines: (medicines) => set({ medicinesList: medicines }),
       updateTaskStatus: (taskId, status) => set((state) => ({
