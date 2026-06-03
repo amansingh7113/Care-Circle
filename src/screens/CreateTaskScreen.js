@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { createTask } from '../services/taskApi';
+import useStore from '../store/useStore';
 
 const CreateTaskScreen = ({ route, navigation }) => {
-  const { circleId = 'mock_circle_id' } = route.params || {};
+  const currentCircle = useStore(state => state.currentCircle);
+  const circleId = route.params?.circleId || currentCircle?.id;
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('');

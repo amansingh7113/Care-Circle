@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   SafeAreaView
 } from 'react-native';
+import { getExpensesSummary, addExpense } from '../../services/expenseApi';
 
 const ExpensesScreen = () => {
   const [loading, setLoading] = useState(true);
@@ -25,14 +26,25 @@ const ExpensesScreen = () => {
   const fetchExpensesSummary = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/v1/expenses/summary');
-      if (response.ok) {
-        const data = await response.json();
-        setSummary(data);
-      }
+      const data = await getExpensesSummary();
+      setSummary({ ...data, items: data.expenses || [] });
     } catch (error) {
       console.error('Failed to fetch expenses summary', error);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddExpense = async () => {
+    if (!amount) return;
+    try {
+      setLoading(true);
+      await addExpense({ amount: Number(amount), category, description: 'Added via app' });
+      setModalVisible(false);
+      setAmount('');
+      fetchExpensesSummary();
+    } catch (error) {
+      console.error('Failed to add expense', error);
       setLoading(false);
     }
   };
@@ -132,10 +144,7 @@ const ExpensesScreen = () => {
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.button, styles.saveButton]} 
-                onPress={() => {
-                  setModalVisible(false);
-                  setAmount('');
-                }}
+                onPress={handleAddExpense}
               >
                 <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>

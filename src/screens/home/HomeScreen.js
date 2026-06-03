@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import useStore from '../../store/useStore';
+import { getMedicines } from '../../services/medicineApi';
+import { getTasks } from '../../services/taskApi';
+import { getDoctorVisits } from '../../services/doctorVisitApi';
+import { getExpensesSummary } from '../../services/expenseApi';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
@@ -19,21 +23,22 @@ const HomeScreen = () => {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        const baseUrl = 'http://10.218.115.31:5000';
+        const circleId = useStore.getState().currentCircle?.id;
+        
         const [medicinesRes, tasksRes, visitsRes, expensesRes] = await Promise.all([
-          fetch(`${baseUrl}/api/v1/medicines`).then(res => res.json()).catch(() => ({ data: [] })),
-          fetch(`${baseUrl}/api/v1/tasks`).then(res => res.json()).catch(() => ({ data: [] })),
-          fetch(`${baseUrl}/api/v1/doctor-visits`).then(res => res.json()).catch(() => ({ data: [] })),
-          fetch(`${baseUrl}/api/v1/expenses/summary`).then(res => res.json()).catch(() => ({ data: { total_spent: 0 } })),
+          circleId ? getMedicines(circleId).catch(() => ([])) : Promise.resolve([]),
+          circleId ? getTasks(circleId).catch(() => ([])) : Promise.resolve([]),
+          circleId ? getDoctorVisits(circleId).catch(() => ({ data: [] })) : Promise.resolve({ data: [] }),
+          circleId ? getExpensesSummary().catch(() => ({ total_spent: 0 })) : Promise.resolve({ total_spent: 0 }),
         ]);
 
-        const pendingMeds = (medicinesRes.data || []).filter(m => m.status === 'Pending').length;
-        const activeTasksCount = (tasksRes.data || []).filter(t => t.status === 'Todo' || t.status === 'In Progress').length;
+        const pendingMeds = (medicinesRes || []).filter(m => m.status === 'Pending').length;
+        const activeTasksCount = (tasksRes || []).filter(t => t.status === 'Todo' || t.status === 'pending').length;
         
         const visits = visitsRes.data || [];
-        const upcoming = visits.sort((a, b) => new Date(a.date) - new Date(b.date))[0] || null;
+        const upcoming = visits.sort((a, b) => new Date(a.visit_date) - new Date(b.visit_date))[0] || null;
 
-        const spent = expensesRes.data?.total_spent || 0;
+        const spent = expensesRes?.total_spent || 0;
 
         setMetrics({
           pendingMedicines: pendingMeds,

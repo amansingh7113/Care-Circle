@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { getDoctorVisits, addDoctorVisit } from '../../services/doctorVisitApi';
 
 const PRIMARY_BLUE = '#1A73E8';
 const TOUCH_TARGET_SIZE = 48;
@@ -33,12 +34,8 @@ const DoctorVisitsScreen = () => {
   const fetchVisits = async () => {
     try {
       setLoading(true);
-      // Replace with your actual api client config if different
-      const response = await fetch('http://10.218.115.31:5000/api/v1/doctor-visits');
-      if (response.ok) {
-        const data = await response.json();
-        setVisits(data.data || []);
-      }
+      const data = await getDoctorVisits();
+      setVisits(data.data || []);
     } catch (error) {
       console.error('Error fetching doctor visits:', error);
     } finally {
@@ -46,26 +43,30 @@ const DoctorVisitsScreen = () => {
     }
   };
 
-  const handleAddVisit = () => {
+  const handleAddVisit = async () => {
     // Basic validation could go here
     if (!doctorName || !visitDate) {
       Alert.alert('Error', 'Please provide at least a Doctor Name and Date');
       return;
     }
     
-    // In a real implementation, POST to /api/v1/doctor-visits here
-    const newVisit = {
-      id: Math.random().toString(),
-      doctor_name: doctorName,
-      visit_date: visitDate,
-      reason,
-      notes,
-      attachment_urls: [],
-    };
-    
-    setVisits([newVisit, ...visits]);
-    setModalVisible(false);
-    resetForm();
+    try {
+      setLoading(true);
+      await addDoctorVisit({
+        doctor_name: doctorName,
+        visit_date: visitDate,
+        reason,
+        notes,
+        attachment_urls: [],
+      });
+      setModalVisible(false);
+      resetForm();
+      fetchVisits();
+    } catch (error) {
+       console.error('Failed to add visit', error);
+       Alert.alert('Error', 'Failed to add visit');
+       setLoading(false);
+    }
   };
 
   const resetForm = () => {

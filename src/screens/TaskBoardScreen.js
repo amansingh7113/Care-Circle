@@ -2,9 +2,11 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getTasks, updateTaskStatus } from '../services/taskApi';
+import useStore from '../store/useStore';
 
 const TaskBoardScreen = ({ route, navigation }) => {
-  const { circleId = 'mock_circle_id' } = route.params || {};
+  const currentCircle = useStore(state => state.currentCircle);
+  const circleId = route.params?.circleId || currentCircle?.id;
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');

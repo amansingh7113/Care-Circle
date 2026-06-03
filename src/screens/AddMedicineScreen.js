@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { addMedicine } from '../services/medicineApi';
+import useStore from '../store/useStore';
 
 const AddMedicineScreen = ({ route, navigation }) => {
-  const { circleId = 'mock_circle_id' } = route.params || {};
+  const currentCircle = useStore(state => state.currentCircle);
+  const circleId = route.params?.circleId || currentCircle?.id;
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [frequency, setFrequency] = useState('Daily');
