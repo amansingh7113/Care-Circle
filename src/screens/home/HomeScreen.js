@@ -19,11 +19,12 @@ const HomeScreen = () => {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
+        const baseUrl = 'http://10.218.115.31:5000';
         const [medicinesRes, tasksRes, visitsRes, expensesRes] = await Promise.all([
-          fetch('http://localhost:3000/api/v1/medicines').then(res => res.json()).catch(() => ({ data: [] })),
-          fetch('http://localhost:3000/api/v1/tasks').then(res => res.json()).catch(() => ({ data: [] })),
-          fetch('http://localhost:3000/api/v1/doctor-visits').then(res => res.json()).catch(() => ({ data: [] })),
-          fetch('http://localhost:3000/api/v1/expenses/summary').then(res => res.json()).catch(() => ({ data: { total_spent: 0 } })),
+          fetch(`${baseUrl}/api/v1/medicines`).then(res => res.json()).catch(() => ({ data: [] })),
+          fetch(`${baseUrl}/api/v1/tasks`).then(res => res.json()).catch(() => ({ data: [] })),
+          fetch(`${baseUrl}/api/v1/doctor-visits`).then(res => res.json()).catch(() => ({ data: [] })),
+          fetch(`${baseUrl}/api/v1/expenses/summary`).then(res => res.json()).catch(() => ({ data: { total_spent: 0 } })),
         ]);
 
         const pendingMeds = (medicinesRes.data || []).filter(m => m.status === 'Pending').length;

@@ -1,76 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import useStore from '../store/useStore';
+import { createStackNavigator } from '@react-navigation/stack';
+import CircleSelectionScreen from '../screens/CircleSelectionScreen';
+import DashboardScreen from '../screens/DashboardScreen';
+import MedicineDashboardScreen from '../screens/MedicineDashboardScreen';
+import AddMedicineScreen from '../screens/AddMedicineScreen';
+import TaskBoardScreen from '../screens/TaskBoardScreen';
+import CreateTaskScreen from '../screens/CreateTaskScreen';
 
-const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+const Stack = createStackNavigator();
 
-import HomeScreen from '../screens/home/HomeScreen';
-
-const PatientDashboardScreen = () => (
-  <View style={styles.center}><Text>Patient Dashboard</Text></View>
-);
-
-const MedicinesScreen = () => (
-  <View style={styles.center}><Text>Medicines</Text></View>
-);
-
-const TasksScreen = () => (
-  <View style={styles.center}><Text>Tasks</Text></View>
-);
-
-const MoreScreen = () => (
-  <View style={styles.center}><Text>More</Text></View>
-);
-
-const MainTabNavigator = () => {
+const AppNavigator = () => {
   return (
-    <Tab.Navigator
+    <Stack.Navigator
+      initialRouteName="CircleSelection"
       screenOptions={{
-        tabBarActiveTintColor: '#1A73E8',
-        tabBarItemStyle: {
-          minHeight: 48,
-          minWidth: 48,
-          justifyContent: 'center',
-          alignItems: 'center',
-        },
+        headerShown: false,
       }}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Medicines" component={MedicinesScreen} />
-      <Tab.Screen name="Tasks" component={TasksScreen} />
-      <Tab.Screen name="More" component={MoreScreen} />
-    </Tab.Navigator>
-  );
-};
-
-const PatientStackNavigator = () => {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="PatientDashboard" component={PatientDashboardScreen} />
+      <Stack.Screen name="CircleSelection" component={CircleSelectionScreen} />
+      <Stack.Screen name="Dashboard" component={DashboardScreen} />
+      <Stack.Screen name="MedicineTracker" component={MedicineDashboardScreen} />
+      <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
+      <Stack.Screen name="TaskBoard" component={TaskBoardScreen} />
+      <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
     </Stack.Navigator>
   );
 };
-
-const AppNavigator = () => {
-  const role = useStore((state) => state.role);
-
-  return (
-    <NavigationContainer>
-      {role === 'Patient' ? <PatientStackNavigator /> : <MainTabNavigator />}
-    </NavigationContainer>
-  );
-};
-
-const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default AppNavigator;

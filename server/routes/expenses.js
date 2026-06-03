@@ -4,7 +4,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder_key');
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 router.post('/', async (req, res) => {
   try {

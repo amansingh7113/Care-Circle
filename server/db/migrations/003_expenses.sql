@@ -20,9 +20,9 @@ ALTER TABLE circle_budgets ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can manage expenses in their circle"
 ON expenses
 FOR ALL
-USING (circle_id = get_user_circle_id());
+USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
 
 CREATE POLICY "Users can manage budgets in their circle"
 ON circle_budgets
 FOR ALL
-USING (circle_id = get_user_circle_id());
+USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));

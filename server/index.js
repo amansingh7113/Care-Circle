@@ -18,7 +18,7 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 
 // Create a single supabase client for interacting with your database
-const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder_key');
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const authRouter = require('./routes/auth');
 const circlesRouter = require('./routes/circles');
@@ -35,7 +35,7 @@ app.use('/api/v1/expenses', expensesRouter);
 // Dashboard Route (Placeholder)
 app.get('/dashboard', async (req, res) => {
   // TODO: Implement aggregation of medicines, tasks, and visits
-  res.status(200).json({ 
+  res.status(200).json({
     message: 'Dashboard data (stub)',
     data: {
       medicines: [],
@@ -45,6 +45,14 @@ app.get('/dashboard', async (req, res) => {
   });
 });
 
-app.listen(port, () => {
-  console.log(`CareCircle server listening on port ${port}`);
-});
+const runMigrations = require('./db/migrate');
+
+async function startServer() {
+  await runMigrations();
+
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`CareCircle server listening on port ${port} (IPv4)`);
+  });
+}
+
+startServer();

@@ -14,7 +14,7 @@ router.post('/', async (req, res) => {
     const token = req.headers.authorization?.split(' ')[1];
     
     // Create Supabase client using the user's JWT to leverage RLS
-    const userSupabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseKey || 'placeholder_key', {
+    const userSupabase = createClient(supabaseUrl, supabaseKey, {
       global: { headers: { Authorization: `Bearer ${token}` } }
     });
 

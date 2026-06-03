@@ -34,7 +34,7 @@ const DoctorVisitsScreen = () => {
     try {
       setLoading(true);
       // Replace with your actual api client config if different
-      const response = await fetch('http://localhost:3000/api/v1/doctor-visits');
+      const response = await fetch('http://10.218.115.31:5000/api/v1/doctor-visits');
       if (response.ok) {
         const data = await response.json();
         setVisits(data.data || []);
