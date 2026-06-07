@@ -1,8 +1,10 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
 import { getCircleDetails } from '../services/circleApi';
 import { THEME } from '../styles/theme';
+import CircularProgressRing from '../components/CircularProgressRing';
 
 const mockActivities = [
   { id: '1', user: 'Aman', action: 'completed a task', time: '10m ago', color: THEME.colors.success },
@@ -13,8 +15,8 @@ const mockActivities = [
 const mockVitals = [
   { id: '1', label: 'Blood Pressure', value: '120/80', icon: '❤️', color: THEME.colors.alert },
   { id: '2', label: 'Mood', value: 'Good', icon: '😊', color: THEME.colors.primary },
-  { id: '3', label: 'Hydration', value: '1.5L', icon: '💧', color: THEME.colors.secondary },
-  { id: '4', label: 'Sleep', value: '7h 20m', icon: '🌙', color: THEME.colors.textMuted },
+  { id: '3', label: 'Hydration', value: '1.5L', icon: '💧', color: '#3BA0E3' }, // custom blue
+  { id: '4', label: 'Sleep', value: '7h 20m', icon: '🌙', color: '#FCD34D' }, // custom yellow
 ];
 
 const DashboardScreen = ({ route, navigation }) => {
@@ -28,7 +30,6 @@ const DashboardScreen = ({ route, navigation }) => {
         fetchCircleData();
       } else {
         setIsLoading(false);
-        // Add mock members if no circle ID for preview purposes
         setMembers([
           { id: 1, name: 'Aman', role: 'Admin' },
           { id: 2, name: 'Anshika', role: 'Member' },
@@ -56,120 +57,130 @@ const DashboardScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-        <View style={styles.headerContainer}>
-          <Text style={styles.header}>{circleName}</Text>
-        </View>
-
-        {/* Module C: Horizontal Care Circle Avatar Stack */}
-        <View style={styles.avatarSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.avatarScroll}>
-            {isLoading ? (
-               <View style={styles.avatarLoader}><ActivityIndicator color={THEME.colors.primary} /></View>
-            ) : (
-              members.map((member) => (
-                <View key={member.id} style={styles.avatarCircle}>
-                  <Text style={styles.avatarText}>{getInitials(member.name)}</Text>
-                </View>
-              ))
-            )}
-            <TouchableOpacity 
-              style={[styles.avatarCircle, styles.addAvatarCircle]}
-              onPress={() => Alert.alert('Invite', 'Navigate to Invite Code Screen')}
-            >
-              <Text style={styles.addAvatarText}>+</Text>
-            </TouchableOpacity>
-          </ScrollView>
+    <View style={styles.safeArea}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        
+        {/* Module: Daily Progress Hero Card */}
+        <View style={styles.progressSection}>
+          <View style={styles.progressCard}>
+            <CircularProgressRing progress={75} size={110} strokeWidth={14} color={THEME.colors.primary} />
+            <View style={styles.progressInfo}>
+              <Text style={styles.progressValue}>75%</Text>
+              <Text style={styles.progressLabel}>TASKS COMPLETED</Text>
+            </View>
+          </View>
         </View>
 
         {/* Module B: Wellness Vitals Quick-Grid */}
         <View style={styles.vitalsSection}>
-          <Text style={styles.sectionTitle}>Daily Vitals</Text>
+          <Text style={styles.sectionTitle}>Vitals</Text>
           <View style={styles.vitalsGrid}>
             {mockVitals.map(vital => (
               <View key={vital.id} style={styles.vitalCard}>
-                <View style={[styles.vitalIconContainer, { backgroundColor: `${vital.color}15` }]}>
+                <View style={styles.vitalHeaderRow}>
                   <Text style={styles.vitalIcon}>{vital.icon}</Text>
+                  <Text style={styles.vitalValue}>{vital.value}</Text>
                 </View>
-                <Text style={styles.vitalValue}>{vital.value}</Text>
-                <Text style={styles.vitalLabel}>{vital.label}</Text>
+                {/* Visual Indicator Placeholder */}
+                <View style={[styles.vitalBarContainer, { backgroundColor: `${vital.color}20` }]}>
+                  <View style={[styles.vitalBarFill, { backgroundColor: vital.color, width: '70%' }]} />
+                </View>
+                <Text style={styles.vitalLabel}>{vital.label.toUpperCase()}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Module A: Live Care Circle Activity Feed */}
+        {/* Module A: Live Care Circle Activity Feed Timeline */}
         <View style={styles.activitySection}>
           <Text style={styles.sectionTitle}>Activity Feed</Text>
           <View style={styles.timelineContainer}>
             {mockActivities.map((activity, index) => (
               <View key={activity.id} style={styles.timelineItem}>
                 <View style={styles.timelineLeft}>
-                  <View style={[styles.timelineDot, { backgroundColor: activity.color }]} />
+                  <View style={[styles.timelineIconBadge, { backgroundColor: `${activity.color}20` }]}>
+                     {/* Replace with actual icons based on action type */}
+                     {activity.action.includes('medication') || activity.action.includes('Meds') ? (
+                       <Text style={{fontSize: 12}}>💊</Text>
+                     ) : activity.action.includes('blood pressure') || activity.action.includes('Vitals') ? (
+                       <Text style={{fontSize: 12}}>❤️</Text>
+                     ) : (
+                       <Text style={{fontSize: 12}}>📋</Text>
+                     )}
+                  </View>
                   {index !== mockActivities.length - 1 && <View style={styles.timelineLine} />}
                 </View>
                 <View style={styles.timelineContent}>
-                  <View style={styles.activityCard}>
-                    <Text style={styles.activityText}>
-                      <Text style={styles.activityUser}>{activity.user}</Text> {activity.action}
-                    </Text>
-                    <Text style={styles.activityTime}>{activity.time}</Text>
-                  </View>
+                  <Text style={styles.activityText}>
+                    <Text style={styles.activityUser}>{activity.user}</Text> {activity.action}
+                  </Text>
+                  <Text style={styles.activityTime}>{activity.time.toUpperCase()}</Text>
                 </View>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Quick Actions */}
+        {/* Quick Actions (Keeping for functionality but updating style) */}
         <View style={styles.shortcutsContainer}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.shortcutsRow}>
             <TouchableOpacity 
               style={[styles.shortcutButton, { backgroundColor: THEME.colors.primary }]}
               onPress={() => navigation.navigate('MedicineTracker')}
             >
-              <Text style={styles.buttonText}>💊 Meds</Text>
+              <Text style={styles.buttonText}>Medicine Tracker</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: THEME.colors.secondary }]}
+              style={[styles.shortcutButton, { backgroundColor: THEME.colors.deepNavy }]}
               onPress={() => navigation.navigate('TaskBoard')}
             >
-              <Text style={styles.buttonText}>📋 Tasks</Text>
+              <Text style={styles.buttonText}>Task Board</Text>
             </TouchableOpacity>
           </View>
         </View>
         
-        <View style={{height: 40}} />
+        <View style={{height: 100}} />
       </ScrollView>
-    </SafeAreaView>
+
+      {/* Blurred Header */}
+      <BlurView intensity={90} tint="light" style={styles.blurHeader}>
+        <SafeAreaView>
+          <View style={styles.headerContainer}>
+            <Text style={styles.header}>{circleName}</Text>
+            <TouchableOpacity style={styles.settingsIcon}>
+               {/* Gear icon placeholder */}
+               <Text style={{fontSize: 24, color: THEME.colors.primary}}>⚙️</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </BlurView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: THEME.colors.canvas },
-  container: { flex: 1, paddingHorizontal: 20 },
-  headerContainer: { marginTop: 40, marginBottom: 20 },
+  container: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 120, paddingBottom: 40 },
+  blurHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingHorizontal: 20 },
+  headerContainer: { marginTop: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   header: { ...THEME.typography.header, color: THEME.colors.primary },
+  settingsIcon: { padding: 4 },
   sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 16, marginTop: 8 },
   
-  // Avatar Stack Styles
-  avatarSection: { marginBottom: 28 },
-  avatarScroll: { alignItems: 'center', paddingVertical: 8 },
-  avatarLoader: { width: 50, height: 50, justifyContent: 'center', alignItems: 'center' },
-  avatarCircle: {
-    width: 54, height: 54, borderRadius: 27,
-    backgroundColor: THEME.colors.secondary,
-    justifyContent: 'center', alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 2, borderColor: THEME.colors.cardBg,
-    ...THEME.shadows.soft
+  // Progress Ring Styles
+  progressSection: { marginBottom: 24 },
+  progressCard: {
+    backgroundColor: THEME.colors.cardBg,
+    padding: 24, borderRadius: THEME.borderRadius.card,
+    flexDirection: 'row', alignItems: 'center',
+    ...THEME.shadows.soft,
+    borderWidth: 1, borderColor: THEME.colors.border
   },
-  avatarText: { color: THEME.colors.cardBg, fontSize: 18, fontWeight: '700' },
-  addAvatarCircle: { backgroundColor: THEME.colors.canvas, borderColor: THEME.colors.border, borderWidth: 2, borderStyle: 'dashed' },
-  addAvatarText: { color: THEME.colors.textMuted, fontSize: 24, fontWeight: '400', marginTop: -2 },
-
+  progressInfo: { marginLeft: 24, flex: 1 },
+  progressValue: { ...THEME.typography.header, fontSize: 32, marginBottom: 4 },
+  progressLabel: { ...THEME.typography.label, color: THEME.colors.textBody },
+  
   // Vitals Grid Styles
   vitalsSection: { marginBottom: 28 },
   vitalsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
@@ -177,39 +188,36 @@ const styles = StyleSheet.create({
     width: '48%', backgroundColor: THEME.colors.cardBg,
     padding: 16, borderRadius: THEME.borderRadius.card,
     marginBottom: 16, ...THEME.shadows.soft,
-    alignItems: 'flex-start'
+    borderWidth: 1, borderColor: THEME.colors.border,
+    justifyContent: 'space-between'
   },
-  vitalIconContainer: { padding: 8, borderRadius: 12, marginBottom: 12 },
-  vitalIcon: { fontSize: 20 },
-  vitalValue: { ...THEME.typography.header, fontSize: 22, marginBottom: 4 },
-  vitalLabel: { ...THEME.typography.muted },
+  vitalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  vitalIcon: { fontSize: 20, marginRight: 8 },
+  vitalValue: { ...THEME.typography.cardTitle, fontSize: 20 },
+  vitalBarContainer: { height: 6, borderRadius: 3, width: '100%', marginBottom: 10 },
+  vitalBarFill: { height: '100%', borderRadius: 3 },
+  vitalLabel: { ...THEME.typography.label, fontSize: 10 },
 
   // Activity Feed Styles
   activitySection: { marginBottom: 28 },
-  timelineContainer: { paddingLeft: 8, marginTop: 4 },
-  timelineItem: { flexDirection: 'row', minHeight: 70 },
-  timelineLeft: { alignItems: 'center', width: 24 },
-  timelineDot: { width: 12, height: 12, borderRadius: 6, zIndex: 2, marginTop: 24 },
-  timelineLine: { width: 2, flex: 1, backgroundColor: THEME.colors.border, position: 'absolute', top: 36, bottom: -24, zIndex: 1 },
-  timelineContent: { flex: 1, paddingLeft: 16, paddingBottom: 16 },
-  activityCard: {
-    backgroundColor: THEME.colors.cardBg,
-    padding: 16, borderRadius: THEME.borderRadius.card,
-    ...THEME.shadows.soft,
-    borderWidth: 1, borderColor: THEME.colors.canvas
-  },
+  timelineContainer: { paddingLeft: 4, marginTop: 4 },
+  timelineItem: { flexDirection: 'row', minHeight: 60 },
+  timelineLeft: { alignItems: 'center', width: 32 },
+  timelineIconBadge: { width: 32, height: 32, borderRadius: 16, zIndex: 2, justifyContent: 'center', alignItems: 'center', marginTop: 4 },
+  timelineLine: { width: 2, flex: 1, backgroundColor: `${THEME.colors.border}80`, position: 'absolute', top: 36, bottom: -4, zIndex: 1 },
+  timelineContent: { flex: 1, paddingLeft: 16, paddingBottom: 24, paddingTop: 8 },
   activityText: { ...THEME.typography.body, marginBottom: 6 },
   activityUser: { fontWeight: '700', color: THEME.colors.textHeader },
-  activityTime: { ...THEME.typography.muted, fontSize: 11, fontWeight: '500' },
+  activityTime: { ...THEME.typography.label, fontSize: 10, color: THEME.colors.textMuted },
 
   // Shortcuts Styles
   shortcutsContainer: { marginBottom: 20 },
   shortcutsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   shortcutButton: {
-    width: '48%', padding: 16, borderRadius: THEME.borderRadius.card,
+    width: '48%', padding: 16, borderRadius: THEME.borderRadius.badge,
     alignItems: 'center', ...THEME.shadows.soft
   },
-  buttonText: { color: THEME.colors.cardBg, fontSize: 16, fontWeight: 'bold' }
+  buttonText: { color: THEME.colors.white, fontSize: 14, fontWeight: '700' }
 });
 
 export default DashboardScreen;

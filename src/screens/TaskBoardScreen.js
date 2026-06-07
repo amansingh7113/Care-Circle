@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getTasks, updateTaskStatus } from '../services/taskApi';
 import { useStore } from '../store/useStore';
@@ -58,28 +58,60 @@ const TaskBoardScreen = ({ route, navigation }) => {
 
   const renderTask = ({ item }) => (
     <View style={styles.card}>
-      <View style={styles.cardInfo}>
-        <Text style={styles.taskTitle}>{item.title}</Text>
-        <Text style={styles.taskCategory}>{item.category}</Text>
-        <Text style={styles.taskDetails}>Due: {item.dueDate}</Text>
-        <Text style={styles.taskDetails}>Assignee: {item.assignee}</Text>
-      </View>
-      <View style={styles.actions}>
-        {activeTab === 'pending' && (
-          <TouchableOpacity style={[styles.actionBtn, styles.completeBtn]} onPress={() => handleUpdateStatus(item.id, 'completed')}>
-            <Text style={styles.btnText}>Complete</Text>
-          </TouchableOpacity>
-        )}
+      <View style={styles.cardContent}>
+        <View style={styles.cardInfo}>
+          <Text style={styles.taskTitle}>{item.title}</Text>
+          <View style={styles.taskMetaRow}>
+            <View style={styles.assigneeAvatar}>
+              <Text style={styles.assigneeInitial}>{item.assignee ? item.assignee.charAt(0) : 'U'}</Text>
+            </View>
+            <Text style={styles.taskDetails}>Due: {item.dueDate} - {item.assignee}</Text>
+          </View>
+        </View>
+        <View style={styles.actions}>
+          {activeTab === 'pending' ? (
+             <TouchableOpacity style={styles.completionBadge} onPress={() => handleUpdateStatus(item.id, 'completed')}>
+               <Ionicons name="checkmark" size={20} color={THEME.colors.primary} />
+             </TouchableOpacity>
+          ) : (
+             <View style={[styles.completionBadge, { backgroundColor: THEME.colors.primary }]}>
+               <Ionicons name="checkmark" size={20} color={THEME.colors.white} />
+             </View>
+          )}
+        </View>
       </View>
     </View>
   );
+
+  // Grouping logic for UI
+  const groupedTasks = tasks.reduce((acc, task) => {
+    let group = 'TODAY';
+    if (task.dueDate && task.dueDate.toLowerCase().includes('tomorrow')) group = 'TOMORROW';
+    else if (task.dueDate && task.dueDate.toLowerCase().includes('yesterday')) group = 'PREVIOUS';
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(task);
+    return acc;
+  }, {});
+
+  const renderGroupedTasks = () => {
+    return Object.keys(groupedTasks).map(group => (
+      <View key={group}>
+        <Text style={styles.groupHeader}>{group}</Text>
+        {groupedTasks[group].map(task => (
+          <React.Fragment key={task.id}>
+             {renderTask({ item: task })}
+          </React.Fragment>
+        ))}
+      </View>
+    ));
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={THEME.colors.primary} />
+            <Ionicons name="arrow-back" size={24} color={THEME.colors.white} />
           </TouchableOpacity>
           <Text style={styles.header}>Task Board</Text>
         </View>
@@ -104,7 +136,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
       </View>
 
       {isLoading ? (
-        <View style={styles.container}>
+        <View style={styles.contentArea}>
           <SkeletonLoader />
           <SkeletonLoader />
         </View>
@@ -115,43 +147,97 @@ const TaskBoardScreen = ({ route, navigation }) => {
           subtitleText={activeTab === 'pending' ? "You're all caught up! Enjoy your day." : "You haven't completed any tasks yet."}
         />
       ) : (
-        <FlatList
-          data={tasks}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderTask}
-          contentContainerStyle={styles.list}
-        />
+        <ScrollView contentContainerStyle={styles.listContainer} showsVerticalScrollIndicator={false}>
+          {renderGroupedTasks()}
+        </ScrollView>
       )}
+
+      {/* Base Illustration Anchor */}
+      <View style={styles.bottomIllustration}>
+         <View style={styles.illustrationPlaceholder}>
+            <Text style={{fontSize: 50}}>👩🏽‍⚕️🧑🏻‍⚕️👨🏾‍⚕️</Text>
+         </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.colors.canvas, padding: 20 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, marginTop: 40 },
+  container: { flex: 1, backgroundColor: THEME.colors.deepNavy, padding: 20 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 40 },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   backBtn: { padding: 8, marginLeft: -8, marginRight: 8 },
-  header: { ...THEME.typography.header, color: THEME.colors.primary },
+  header: { ...THEME.typography.header, color: THEME.colors.white, fontSize: 28 },
   addBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  addBtnText: { color: THEME.colors.cardBg, fontWeight: 'bold' },
-  tabContainer: { flexDirection: 'row', marginBottom: 16, backgroundColor: THEME.colors.border, borderRadius: 8, overflow: 'hidden' },
-  tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  addBtnText: { color: THEME.colors.white, fontWeight: '700' },
+  tabContainer: { 
+    flexDirection: 'row', 
+    marginBottom: 24, 
+    backgroundColor: '#E2E8F0', // Soft grey for unselected
+    borderRadius: THEME.borderRadius.badge, 
+    overflow: 'hidden',
+    padding: 4
+  },
+  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: THEME.borderRadius.badge },
   activeTab: { backgroundColor: THEME.colors.primary },
-  tabText: { ...THEME.typography.cardTitle, color: THEME.colors.textMuted },
-  activeTabText: { color: THEME.colors.cardBg },
-  list: { paddingBottom: 20 },
-  card: { backgroundColor: THEME.colors.cardBg, padding: 16, borderRadius: THEME.borderRadius.card, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', ...THEME.shadows.soft, borderWidth: 1, borderColor: THEME.colors.border },
+  tabText: { ...THEME.typography.cardTitle, color: THEME.colors.textMuted, fontSize: 14 },
+  activeTabText: { color: THEME.colors.white },
+  listContainer: { paddingBottom: 150 },
+  groupHeader: {
+    color: THEME.colors.white,
+    ...THEME.typography.label,
+    fontSize: 12,
+    marginBottom: 12,
+    marginTop: 16,
+    letterSpacing: 1.2
+  },
+  card: { 
+    backgroundColor: THEME.colors.cardBg, 
+    borderRadius: THEME.borderRadius.card, 
+    marginBottom: 12, 
+    ...THEME.shadows.soft 
+  },
+  cardContent: {
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
   cardInfo: { flex: 1 },
-  taskTitle: { ...THEME.typography.cardTitle },
-  taskCategory: { fontSize: 12, color: THEME.colors.primary, fontWeight: '600', backgroundColor: `${THEME.colors.primary}15`, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, marginTop: 4, marginBottom: 4 },
-  taskDetails: { ...THEME.typography.body, color: THEME.colors.textMuted, marginTop: 2 },
-  actions: { marginLeft: 10 },
-  actionBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
-  completeBtn: { backgroundColor: THEME.colors.success },
-  btnText: { color: THEME.colors.cardBg, fontSize: 14, fontWeight: 'bold' },
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: THEME.colors.textMuted, fontSize: 16 }
+  taskTitle: { ...THEME.typography.cardTitle, marginBottom: 8 },
+  taskMetaRow: { flexDirection: 'row', alignItems: 'center' },
+  assigneeAvatar: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: `${THEME.colors.secondary}20`,
+    justifyContent: 'center', alignItems: 'center',
+    marginRight: 8
+  },
+  assigneeInitial: { fontSize: 10, fontWeight: '700', color: THEME.colors.secondary },
+  taskDetails: { ...THEME.typography.body, color: THEME.colors.textMuted, fontSize: 12 },
+  actions: { marginLeft: 16 },
+  completionBadge: { 
+    width: 32, height: 32, borderRadius: 16,
+    borderWidth: 2, borderColor: THEME.colors.primary,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: THEME.colors.cardBg
+  },
+  contentArea: { flex: 1 },
+  bottomIllustration: {
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    zIndex: -1
+  },
+  illustrationPlaceholder: {
+    backgroundColor: '#FAF6F0',
+    width: '100%',
+    height: 120,
+    borderTopLeftRadius: 100,
+    borderTopRightRadius: 100,
+    alignItems: 'center',
+    justifyContent: 'center'
+  }
 });
 
 export default TaskBoardScreen;

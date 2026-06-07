@@ -82,17 +82,16 @@ const CircleSelectionScreen = ({ navigation }) => {
 
   const renderCircleItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.circleCard} 
+      style={styles.circleThumbnail} 
       onPress={() => {
         useStore.getState().setCircle(item);
         navigation.navigate('Dashboard', { circleId: item.id, circleName: item.name });
       }}
     >
-      <View>
-        <Text style={styles.circleName}>{item.name}</Text>
-        <Text style={styles.circleRole}>{item.role}</Text>
+      <View style={styles.circleAvatar}>
+        <Users size={28} color={THEME.colors.primary} />
       </View>
-      <Users size={20} color={THEME.colors.primary} />
+      <Text style={styles.circleThumbnailName} numberOfLines={1}>{item.name}</Text>
     </TouchableOpacity>
   );
 
@@ -106,87 +105,88 @@ const CircleSelectionScreen = ({ navigation }) => {
 
   return (
     <KeyboardAvoidingView 
-      style={{ flex: 1 }} 
+      style={{ flex: 1, backgroundColor: THEME.colors.canvas }} 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <View style={styles.container}>
-        <Text style={styles.header}>Your Care Circles</Text>
-        
+      <View style={styles.topSection}>
+        <Text style={styles.welcomeText}>WELCOME, USER</Text>
+        {/* Placeholder for top vector graphic */}
+        <View style={styles.graphicPlaceholder}>
+          <Users size={80} color={THEME.colors.alert} />
+        </View>
+      </View>
+
+      <View style={styles.midSection}>
         {circles.length > 0 ? (
           <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
             data={circles}
             keyExtractor={(item, index) => item.id?.toString() || index.toString()}
             renderItem={renderCircleItem}
-            contentContainerStyle={styles.list}
-            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.horizontalList}
           />
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>You are not part of any circle yet.</Text>
           </View>
         )}
+      </View>
 
-        <View style={styles.actionsContainer}>
-          <View style={styles.formCard}>
-            <Text style={styles.cardTitle}>
-              {mode === 'join' ? 'Join a Circle' : 'Create a Circle'}
-            </Text>
-            
-            <View style={[styles.inputContainer, isFocused && styles.inputFocused]}>
-              {mode === 'join' ? (
-                <Key size={20} color={isFocused ? THEME.colors.primary : THEME.colors.textMuted} style={styles.inputIcon} />
-              ) : (
-                <Users size={20} color={isFocused ? THEME.colors.primary : THEME.colors.textMuted} style={styles.inputIcon} />
-              )}
-              <TextInput
-                style={styles.input}
-                placeholder={mode === 'join' ? "Enter Invite Code" : "New Circle Name"}
-                placeholderTextColor={THEME.colors.textMuted}
-                value={inputValue}
-                onChangeText={setInputValue}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                autoCapitalize={mode === 'join' ? 'characters' : 'words'}
-              />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.primaryButton} 
-              onPress={handleSubmit}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.primaryButtonText}>
-                  {mode === 'join' ? 'Join Circle' : 'Create Circle'}
-                </Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.secondaryButton} 
-              onPress={() => {
-                setMode(mode === 'join' ? 'create' : 'join');
-                setInputValue('');
-              }}
-            >
-              <Text style={styles.secondaryButtonText}>
-                {mode === 'join' ? 'Create a new Care Circle' : 'Join an existing Circle'}
-              </Text>
-            </TouchableOpacity>
-            
-            {/* Skip for now - Fallback for reviewers or users without invites if circles are empty */}
-            {circles.length === 0 && (
-              <TouchableOpacity 
-                style={styles.skipButton}
-                onPress={() => Alert.alert("Information", "You need to join or create a circle to access the dashboard.")}
-              >
-                <Text style={styles.skipButtonText}>Skip for now</Text>
-              </TouchableOpacity>
+      <View style={styles.bottomSection}>
+        <View style={styles.formCard}>
+          <Text style={styles.cardTitle}>
+            {mode === 'join' ? 'JOIN YOUR CARE CIRCLE' : 'CREATE A CARE CIRCLE'}
+          </Text>
+          
+          <View style={[styles.inputContainer, isFocused && styles.inputFocused]}>
+            {mode === 'join' ? (
+              <Key size={20} color={isFocused ? THEME.colors.primary : THEME.colors.textMuted} style={styles.inputIcon} />
+            ) : (
+              <Users size={20} color={isFocused ? THEME.colors.primary : THEME.colors.textMuted} style={styles.inputIcon} />
             )}
+            <TextInput
+              style={styles.input}
+              placeholder={mode === 'join' ? "Enter Invite Code" : "New Circle Name"}
+              placeholderTextColor={THEME.colors.textMuted}
+              value={inputValue}
+              onChangeText={setInputValue}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              autoCapitalize={mode === 'join' ? 'characters' : 'words'}
+            />
           </View>
+
+          <TouchableOpacity 
+            style={styles.primaryButton} 
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {mode === 'join' ? 'Join Circle' : 'Create Circle'}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.secondaryButton} 
+            onPress={() => {
+              setMode(mode === 'join' ? 'create' : 'join');
+              setInputValue('');
+            }}
+          >
+            <Text style={styles.secondaryButtonText}>
+              {mode === 'join' ? 'Create a new Care Circle' : 'Join an existing Circle'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Graphic Anchor */}
+        <View style={styles.bottomGraphic}>
+           <View style={{ width: 200, height: 100, backgroundColor: `${THEME.colors.primary}20`, borderRadius: 50, marginTop: 40 }} />
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -194,65 +194,83 @@ const CircleSelectionScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: THEME.colors.canvas, 
-    padding: 20 
-  },
-  center: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  header: { 
-    ...THEME.typography.header,
-    marginBottom: 20, 
-    marginTop: 40 
-  },
-  list: { 
-    paddingBottom: 20 
-  },
-  circleCard: { 
-    backgroundColor: THEME.colors.cardBg, 
-    padding: 20, 
-    borderRadius: THEME.borderRadius.card, 
-    marginBottom: 12, 
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  topSection: {
+    backgroundColor: THEME.colors.deepNavy,
+    height: '35%',
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    paddingTop: 80,
     alignItems: 'center',
-    ...THEME.shadows.soft 
+    zIndex: 2,
   },
-  circleName: { 
-    ...THEME.typography.cardTitle,
-    color: THEME.colors.primary 
+  welcomeText: {
+    color: THEME.colors.white,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 20,
   },
-  circleRole: { 
-    ...THEME.typography.muted,
-    marginTop: 4 
+  graphicPlaceholder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyState: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
+  midSection: {
+    height: 140,
+    marginTop: -20, // Overlap slightly with top section
+    zIndex: 3,
   },
-  emptyText: { 
-    ...THEME.typography.body,
-    color: THEME.colors.textMuted 
+  horizontalList: {
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    alignItems: 'center',
   },
-  actionsContainer: { 
-    marginTop: 'auto', 
-    paddingTop: 10 
+  circleThumbnail: {
+    alignItems: 'center',
+    marginRight: 24,
+    width: 80,
+  },
+  circleAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: THEME.colors.canvas,
+    borderWidth: 3,
+    borderColor: THEME.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    ...THEME.shadows.soft
+  },
+  circleThumbnailName: {
+    ...THEME.typography.label,
+    color: THEME.colors.textHeader,
+    textAlign: 'center',
+  },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyText: { ...THEME.typography.body, color: THEME.colors.textMuted },
+  bottomSection: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    alignItems: 'center',
   },
   formCard: {
+    width: '100%',
     backgroundColor: THEME.colors.cardBg,
     borderRadius: THEME.borderRadius.card,
     padding: 24,
-    ...THEME.shadows.soft
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadows.soft,
+    zIndex: 4,
   },
   cardTitle: {
     ...THEME.typography.cardTitle,
-    marginBottom: 16,
-    textAlign: 'center'
+    marginBottom: 20,
+    textAlign: 'center',
+    letterSpacing: 0.5,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -262,15 +280,13 @@ const styles = StyleSheet.create({
     borderRadius: THEME.borderRadius.badge,
     height: 56,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     backgroundColor: THEME.colors.canvas
   },
   inputFocused: {
     borderColor: THEME.colors.primary,
   },
-  inputIcon: {
-    marginRight: 12,
-  },
+  inputIcon: { marginRight: 12 },
   input: { 
     flex: 1,
     height: '100%',
@@ -284,28 +300,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16
   },
-  primaryButtonText: { 
-    color: '#fff', 
-    fontSize: 16, 
-    fontWeight: '600' 
-  },
-  secondaryButton: {
-    paddingVertical: 8,
+  primaryButtonText: { color: THEME.colors.white, fontSize: 16, fontWeight: '700' },
+  secondaryButton: { paddingVertical: 8, alignItems: 'center' },
+  secondaryButtonText: { ...THEME.typography.body, color: THEME.colors.textMuted, fontWeight: '600' },
+  bottomGraphic: {
+    position: 'absolute',
+    bottom: -20,
+    zIndex: 1,
     alignItems: 'center',
-  },
-  secondaryButtonText: {
-    ...THEME.typography.body,
-    color: THEME.colors.secondary,
-    fontWeight: '600'
-  },
-  skipButton: {
-    paddingVertical: 8,
-    alignItems: 'center',
-    marginTop: 4
-  },
-  skipButtonText: {
-    ...THEME.typography.muted,
-    textDecorationLine: 'underline'
   }
 });
 

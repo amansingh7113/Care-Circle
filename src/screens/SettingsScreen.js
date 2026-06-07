@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, ScrollView, Share, ActivityIndicator } from 'react-native';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { THEME } from '../styles/theme';
 import axios from 'axios';
 import { API_BASE_URL } from '../services/apiConfig';
@@ -9,10 +10,56 @@ import { Ionicons } from '@expo/vector-icons';
 
 const SettingsScreen = ({ navigation }) => {
   const user = useStore(state => state.user);
-  const clearSession = useStore(state => state.clearSession); // assuming this exists
+  const clearSession = useStore(state => state.clearSession);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [legalModalVisible, setLegalModalVisible] = useState(false);
-  const [legalType, setLegalType] = useState(''); // 'privacy' or 'terms'
+  const [legalType, setLegalType] = useState('');
+  
+  const [inviteCode, setInviteCode] = useState('');
+  const [isLoadingCode, setIsLoadingCode] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  useEffect(() => {
+    generateInviteCode();
+  }, []);
+
+  const generateInviteCode = async () => {
+    setIsLoadingCode(true);
+    try {
+      const token = useStore.getState().userSession;
+      const response = await axios.post(`${API_BASE_URL}/api/v1/circles/invite-code`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.code) {
+        setInviteCode(response.data.code);
+      } else {
+        setInviteCode('CC-K8X-9Q2');
+      }
+    } catch (error) {
+      console.error('Failed to generate code', error);
+      setInviteCode('CC-K8X-9Q2');
+    } finally {
+      setIsLoadingCode(false);
+    }
+  };
+
+  const handleCopyShare = async () => {
+    if (!inviteCode) return;
+    
+    await Clipboard.setStringAsync(inviteCode);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    setToastMessage('Code copied to clipboard!');
+    setTimeout(() => setToastMessage(''), 3000);
+    
+    try {
+      await Share.share({
+        message: `Join my Care Circle on CareCircle! Use code: ${inviteCode}`
+      });
+    } catch (error) {
+      console.error('Share failed', error);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     try {
@@ -54,22 +101,55 @@ const SettingsScreen = ({ navigation }) => {
         <View style={{ width: 24 }} />
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Legal & Compliance</Text>
-        <TouchableOpacity style={styles.rowButton} onPress={() => openLegal('privacy')}>
-          <Text style={styles.rowButtonText}>Privacy Policy</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.rowButton} onPress={() => openLegal('terms')}>
-          <Text style={styles.rowButtonText}>Terms of Service</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Invite Member Component */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Invite to Circle</Text>
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteDescription}>
+              Share this unique code with family members or caregivers to grant them secure access to this Care Circle.
+            </Text>
+            
+            <View style={styles.codeContainer}>
+              {isLoadingCode ? (
+                <ActivityIndicator color={THEME.colors.primary} />
+              ) : (
+                <Text style={styles.codeText}>{inviteCode || '---'}</Text>
+              )}
+            </View>
+            
+            <TouchableOpacity style={styles.shareButton} onPress={handleCopyShare} disabled={isLoadingCode}>
+              <Ionicons name="share-social-outline" size={20} color={THEME.colors.cardBg} />
+              <Text style={styles.shareButtonText}>Copy & Share</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account Management</Text>
-        <TouchableOpacity style={[styles.rowButton, styles.deleteButton]} onPress={() => setDeleteModalVisible(true)}>
-          <Text style={styles.deleteButtonText}>Delete Account</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Legal & Compliance</Text>
+          <TouchableOpacity style={styles.rowButton} onPress={() => openLegal('privacy')}>
+            <Text style={styles.rowButtonText}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rowButton} onPress={() => openLegal('terms')}>
+            <Text style={styles.rowButtonText}>Terms of Service</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account Management</Text>
+          <TouchableOpacity style={[styles.rowButton, styles.deleteButton]} onPress={() => setDeleteModalVisible(true)}>
+            <Text style={styles.deleteButtonText}>Delete Account</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
+
+      {/* Simple Toast Overlay */}
+      {toastMessage ? (
+        <View style={styles.toastContainer}>
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      ) : null}
 
       {/* Delete Account Modal */}
       <Modal visible={deleteModalVisible} transparent={true} animationType="fade">
@@ -123,6 +203,68 @@ const styles = StyleSheet.create({
   deleteButton: { borderColor: THEME.colors.alert, borderWidth: 1, backgroundColor: '#FEF2F2' },
   deleteButtonText: { ...THEME.typography.body, color: THEME.colors.alert, fontWeight: 'bold' },
   
+  // Invite Component Styles
+  inviteCard: {
+    backgroundColor: THEME.colors.cardBg,
+    borderRadius: THEME.borderRadius.card,
+    padding: 16,
+    ...THEME.shadows.soft,
+    borderWidth: 1, 
+    borderColor: THEME.colors.border,
+  },
+  inviteDescription: {
+    ...THEME.typography.body,
+    color: THEME.colors.textBody,
+    marginBottom: 16,
+    lineHeight: 20
+  },
+  codeContainer: {
+    backgroundColor: `${THEME.colors.primary}10`,
+    borderWidth: 1,
+    borderColor: THEME.colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: THEME.borderRadius.badge,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  codeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 4,
+    color: THEME.colors.primary
+  },
+  shareButton: {
+    backgroundColor: THEME.colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    borderRadius: THEME.borderRadius.badge,
+    gap: 8
+  },
+  shareButtonText: {
+    color: THEME.colors.cardBg,
+    fontWeight: 'bold',
+    fontSize: 16
+  },
+
+  toastContainer: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    backgroundColor: THEME.colors.textHeader,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    ...THEME.shadows.soft
+  },
+  toastText: {
+    color: THEME.colors.cardBg,
+    ...THEME.typography.body,
+    fontWeight: '600'
+  },
+
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalContent: { backgroundColor: THEME.colors.cardBg, padding: 24, borderRadius: THEME.borderRadius.card, width: '100%', ...THEME.shadows.soft },
   modalTitle: { ...THEME.typography.header, fontSize: 22, color: THEME.colors.alert, marginBottom: 12 },
