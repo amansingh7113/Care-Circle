@@ -5,6 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store/useStore';
+import * as Haptics from 'expo-haptics';
 
 // Ensure the browser closes when returning to the app
 WebBrowser.maybeCompleteAuthSession();
@@ -30,6 +31,7 @@ const LoginScreen = ({ navigation }) => {
             if (exchangeData.token) {
               await AsyncStorage.setItem('userToken', exchangeData.token);
               useStore.getState().setSession(exchangeData.token);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
               Alert.alert('Success', 'Successfully signed in!');
             }
           } catch (err) {
@@ -66,6 +68,7 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
     try {
       await sendOtp(phone);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       navigation.navigate('VerifyOtp', { phone });
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to send verification code');

@@ -162,4 +162,39 @@ router.post('/exchange-session', async (req, res) => {
   }
 });
 
+// 5. Delete Account (Hard Delete)
+router.delete('/delete-account', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return res.status(401).json({ error: 'No authorization header' });
+    
+    const token = authHeader.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'No token provided' });
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    if (!userId) return res.status(401).json({ error: 'Invalid token payload' });
+
+    // Ensure we use the service_role key to bypass RLS and delete from auth.users
+    const adminSupabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    // Hard delete user using Admin API (this cascades depending on DB foreign key setup)
+    const { data, error } = await adminSupabase.auth.admin.deleteUser(userId);
+
+    if (error) {
+      console.error('Delete user error:', error);
+      return res.status(500).json({ error: 'Failed to delete user account.' });
+    }
+
+    res.status(200).json({ success: true, message: 'Account permanently deleted' });
+  } catch (err) {
+    console.error('Delete account catch error:', err);
+    res.status(500).json({ error: 'Internal server error during account deletion' });
+  }
+});
+
 module.exports = router;

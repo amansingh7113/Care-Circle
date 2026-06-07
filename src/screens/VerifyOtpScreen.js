@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { verifyOtp } from '../services/authApi';
 import { useStore } from '../store/useStore';
+import * as Haptics from 'expo-haptics';
 
 const VerifyOtpScreen = ({ route, navigation }) => {
   const { phone } = route.params;
@@ -21,6 +22,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
       if (response.token) {
         await AsyncStorage.setItem('userToken', response.token);
         useStore.getState().setSession(response.token);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert('Success', 'Successfully signed in!');
       } else {
         throw new Error('No token received');

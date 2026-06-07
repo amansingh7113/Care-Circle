@@ -2,6 +2,9 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getCircleDetails } from '../services/circleApi';
+import { THEME } from '../styles/theme';
+import SkeletonLoader from '../components/SkeletonLoader';
+import EmptyState from '../components/EmptyState';
 
 const DashboardScreen = ({ route, navigation }) => {
   const { circleId, circleName = 'My Circle' } = route.params || {};
@@ -38,9 +41,16 @@ const DashboardScreen = ({ route, navigation }) => {
       <View style={styles.rosterContainer}>
         <Text style={styles.sectionTitle}>Active Members</Text>
         {isLoading ? (
-          <ActivityIndicator size="small" color="#1A73E8" />
+          <View>
+            <SkeletonLoader />
+            <SkeletonLoader />
+          </View>
         ) : members.length === 0 ? (
-          <Text style={styles.memberText}>No members found.</Text>
+          <EmptyState 
+            iconName="people-outline" 
+            titleText="No Members Yet" 
+            subtitleText="Invite family members to join your Care Circle."
+          />
         ) : (
           <FlatList
             data={members}
@@ -66,22 +76,30 @@ const DashboardScreen = ({ route, navigation }) => {
         >
           <Text style={styles.buttonText}>📋 Task Board</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.shortcutButton, styles.settingsButton]}
+          onPress={() => navigation.navigate('Settings')}
+        >
+          <Text style={styles.buttonText}>⚙️ Settings & Legal</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 20 },
-  header: { fontSize: 28, fontWeight: 'bold', color: '#1A73E8', marginBottom: 24, marginTop: 40 },
-  rosterContainer: { backgroundColor: '#fff', padding: 20, borderRadius: 12, marginBottom: 24, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 12 },
+  container: { flex: 1, backgroundColor: THEME.colors.canvas, padding: 20 },
+  header: { ...THEME.typography.header, color: THEME.colors.primary, marginBottom: 24, marginTop: 40 },
+  rosterContainer: { backgroundColor: THEME.colors.cardBg, padding: 20, borderRadius: THEME.borderRadius.card, marginBottom: 24, ...THEME.shadows.soft, borderWidth: 1, borderColor: THEME.colors.border },
+  sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 12 },
   rosterList: { paddingLeft: 8 },
-  memberText: { fontSize: 16, color: '#555', marginBottom: 6 },
+  memberText: { ...THEME.typography.body, marginBottom: 6 },
   shortcutsContainer: { flex: 1 },
-  shortcutButton: { backgroundColor: '#1A73E8', padding: 18, borderRadius: 12, alignItems: 'center', marginBottom: 16 },
-  taskButton: { backgroundColor: '#FF6D00' },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
+  shortcutButton: { backgroundColor: THEME.colors.primary, padding: 18, borderRadius: THEME.borderRadius.card, alignItems: 'center', marginBottom: 16, ...THEME.shadows.soft },
+  taskButton: { backgroundColor: THEME.colors.secondary },
+  settingsButton: { backgroundColor: THEME.colors.textMuted },
+  buttonText: { color: THEME.colors.cardBg, fontSize: 18, fontWeight: 'bold' }
 });
 
 export default DashboardScreen;

@@ -6,6 +6,7 @@ import MedicineDashboardScreen from '../screens/MedicineDashboardScreen';
 import AddMedicineScreen from '../screens/AddMedicineScreen';
 import TaskBoardScreen from '../screens/TaskBoardScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 const Stack = createStackNavigator();
 
@@ -23,6 +24,7 @@ const AppNavigator = () => {
       <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
       <Stack.Screen name="TaskBoard" component={TaskBoardScreen} />
       <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   );
 };

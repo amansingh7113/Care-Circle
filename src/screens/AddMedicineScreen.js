@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { addMedicine } from '../services/medicineApi';
 import { useStore } from '../store/useStore';
+import { Ionicons } from '@expo/vector-icons';
+import { THEME } from '../styles/theme';
 
 const AddMedicineScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -31,7 +33,12 @@ const AddMedicineScreen = ({ route, navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView style={styles.container}>
-        <Text style={styles.header}>Add New Medicine</Text>
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Ionicons name="arrow-back" size={24} color={THEME.colors.primary} />
+          </TouchableOpacity>
+          <Text style={styles.header}>Add New Medicine</Text>
+        </View>
 
         <View style={styles.formGroup}>
           <Text style={styles.label}>Medicine Name</Text>
@@ -62,8 +69,10 @@ const AddMedicineScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', padding: 20 },
-  header: { fontSize: 24, fontWeight: 'bold', color: '#1A73E8', marginBottom: 24, marginTop: 40 },
+  container: { flex: 1, backgroundColor: THEME.colors.canvas, padding: 20 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, marginTop: 40 },
+  backBtn: { padding: 8, marginLeft: -8, marginRight: 8 },
+  header: { fontSize: 24, fontWeight: 'bold', color: THEME.colors.primary },
   formGroup: { marginBottom: 16 },
   label: { fontSize: 16, color: '#333', marginBottom: 8, fontWeight: '600' },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 14, borderRadius: 8, fontSize: 16 },
