@@ -5,6 +5,8 @@ import { BlurView } from 'expo-blur';
 import { getCircleDetails } from '../services/circleApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
+import LogBloodPressureModal from './home/LogBloodPressureModal';
+import { useStore } from '../store/useStore';
 
 const mockActivities = [
   { id: '1', user: 'Aman', action: 'completed a task', time: '10m ago', color: THEME.colors.success },
@@ -23,6 +25,10 @@ const DashboardScreen = ({ route, navigation }) => {
   const { circleId, circleName = 'My Circle' } = route.params || {};
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [bpModalVisible, setBpModalVisible] = useState(false);
+  const { bloodPressureLogs } = useStore();
+  
+  const latestBp = bloodPressureLogs && bloodPressureLogs.length > 0 ? `${bloodPressureLogs[0].systolic}/${bloodPressureLogs[0].diastolic}` : '120/80';
 
   useFocusEffect(
     useCallback(() => {
@@ -75,19 +81,30 @@ const DashboardScreen = ({ route, navigation }) => {
         <View style={styles.vitalsSection}>
           <Text style={styles.sectionTitle}>Vitals</Text>
           <View style={styles.vitalsGrid}>
-            {mockVitals.map(vital => (
-              <View key={vital.id} style={styles.vitalCard}>
-                <View style={styles.vitalHeaderRow}>
-                  <Text style={styles.vitalIcon}>{vital.icon}</Text>
-                  <Text style={styles.vitalValue}>{vital.value}</Text>
-                </View>
-                {/* Visual Indicator Placeholder */}
-                <View style={[styles.vitalBarContainer, { backgroundColor: `${vital.color}20` }]}>
-                  <View style={[styles.vitalBarFill, { backgroundColor: vital.color, width: '70%' }]} />
-                </View>
-                <Text style={styles.vitalLabel}>{vital.label.toUpperCase()}</Text>
-              </View>
-            ))}
+            {mockVitals.map(vital => {
+              const isBP = vital.label === 'Blood Pressure';
+              return (
+                <TouchableOpacity 
+                  key={vital.id} 
+                  style={styles.vitalCard}
+                  onPress={() => {
+                    if (isBP) setBpModalVisible(true);
+                  }}
+                  activeOpacity={isBP ? 0.7 : 1}
+                >
+                  <View style={styles.vitalHeaderRow}>
+                    <Text style={styles.vitalIcon}>{vital.icon}</Text>
+                    <Text style={styles.vitalValue}>{isBP && bloodPressureLogs?.length > 0 ? latestBp : vital.value}</Text>
+                  </View>
+                  {/* Visual Indicator Placeholder */}
+                  <View style={[styles.vitalBarContainer, { backgroundColor: `${vital.color}20` }]}>
+                    <View style={[styles.vitalBarFill, { backgroundColor: vital.color, width: '70%' }]} />
+                  </View>
+                  <Text style={styles.vitalLabel}>{vital.label.toUpperCase()}</Text>
+                  {isBP && <Text style={{fontSize: 10, color: THEME.colors.primary, marginTop: 4, fontWeight: 'bold'}}>+ LOG</Text>}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -154,6 +171,8 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         </SafeAreaView>
       </BlurView>
+
+      <LogBloodPressureModal visible={bpModalVisible} onClose={() => setBpModalVisible(false)} />
     </View>
   );
 };

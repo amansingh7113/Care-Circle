@@ -39,6 +39,7 @@
 2. **Task Board:** Implement real-time updates using Supabase Realtime for the kanban/tabbed task view.[cite: 3]
 3. **Doctor Visit Log:** Build the timeline view and the Supabase Storage logic for prescription/report attachments.[cite: 3]
 4. **Expense Tracker:** Implement the monthly spend view and budget progress bar (No individual splitting logic).[cite: 3]
+5. **Vitals Tracking:** Implement Blood Pressure logging with on-device text recognition for auto-filling readings from monitor images.
 
 ### Phase 3: Dashboard & Role Logic
 1. **Dashboard:** Aggregate data from all modules into a single `GET /dashboard` endpoint for high performance.[cite: 3]

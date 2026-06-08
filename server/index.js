@@ -26,12 +26,14 @@ const medicinesRouter = require('./routes/medicines');
 const tasksRouter = require('./routes/tasks');
 const doctorVisitsRouter = require('./routes/doctorVisits');
 const expensesRouter = require('./routes/expenses');
+const vitalsRouter = require('./routes/vitals');
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/circles', circlesRouter);
 app.use('/api/v1/medicines', medicinesRouter);
 app.use('/api/v1/tasks', tasksRouter);
 app.use('/api/v1/doctor-visits', doctorVisitsRouter);
 app.use('/api/v1/expenses', expensesRouter);
+app.use('/api/v1/vitals', vitalsRouter);
 // Dashboard Route (Placeholder)
 app.get('/dashboard', async (req, res) => {
   // TODO: Implement aggregation of medicines, tasks, and visits
