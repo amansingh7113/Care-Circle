@@ -1,9 +1,11 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
+import { Pill } from 'lucide-react-native';
 import { getCircleDetails } from '../services/circleApi';
 import { getSleepLogs } from '../services/sleepApi';
+import { getMedicines } from '../services/medicineApi';
 import { getVitals } from '../services/vitalsApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
@@ -18,7 +20,7 @@ const mockActivities = [
 
 const mockVitals = [
   { id: '1', label: 'Blood Pressure', value: '120/80', icon: '❤️', color: THEME.colors.alert },
-  { id: '2', label: 'Mood', value: 'Good', icon: '😊', color: THEME.colors.primary },
+  { id: '2', label: 'Medication', value: 'In 30 Mins', icon: 'Pill', color: THEME.colors.primary, subLabel: 'Aspirin • 81mg', upcoming: true },
   { id: '3', label: 'Hydration', value: '1.5L', icon: '💧', color: '#3BA0E3' }, // custom blue
   { id: '4', label: 'Sleep', value: '7h 20m', icon: '🌙', color: '#FCD34D' }, // custom yellow
 ];
@@ -26,10 +28,30 @@ const mockVitals = [
 const DashboardScreen = ({ route, navigation }) => {
   const { circleId, circleName = 'My Circle' } = route.params || {};
   const [members, setMembers] = useState([]);
+  const [medicines, setMedicines] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bpModalVisible, setBpModalVisible] = useState(false);
   const { bloodPressureLogs, sleepLogs, setBloodPressureLogs, setSleepLogs } = useStore();
   
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 0.3,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        })
+      ])
+    ).start();
+  }, [pulseAnim]);
+
   const latestBp = bloodPressureLogs && bloodPressureLogs.length > 0 ? `${bloodPressureLogs[0].systolic}/${bloodPressureLogs[0].diastolic}` : '--/--';
   
   const formatDuration = (minutes) => {
@@ -59,15 +81,17 @@ const DashboardScreen = ({ route, navigation }) => {
     setIsLoading(true);
     try {
       // Run API calls in parallel for better performance
-      const [circleData, sleepData, vitalsData] = await Promise.all([
+      const [circleData, sleepData, vitalsData, medsData] = await Promise.all([
         getCircleDetails(circleId),
         getSleepLogs(circleId),
-        getVitals(circleId)
+        getVitals(circleId),
+        getMedicines(circleId).catch(() => ({ medicines: [] }))
       ]);
       
       setMembers(circleData.members || []);
       setSleepLogs(sleepData || []);
       setBloodPressureLogs(vitalsData || []);
+      setMedicines(medsData.medicines || medsData || []);
     } catch (error) {
       console.error('Failed to fetch dashboard data', error);
       Alert.alert('Error', 'Failed to load some dashboard details');
@@ -102,10 +126,25 @@ const DashboardScreen = ({ route, navigation }) => {
             {mockVitals.map(vital => {
               const isBP = vital.label === 'Blood Pressure';
               const isSleep = vital.label === 'Sleep';
+              const isMedication = vital.label === 'Medication';
               
               let displayValue = vital.value;
+              let currentSubLabel = vital.subLabel;
+              let currentUpcoming = vital.upcoming;
+
               if (isBP && bloodPressureLogs?.length > 0) displayValue = latestBp;
               if (isSleep && sleepLogs?.length > 0) displayValue = latestSleep;
+              if (isMedication) {
+                const pendingMeds = medicines.filter(m => m.status !== 'taken');
+                const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
+                currentUpcoming = !!nextMed;
+                displayValue = nextMed 
+                  ? (nextMed.time || (nextMed.instructions?.scheduled_times ? nextMed.instructions.scheduled_times[0] : 'Upcoming'))
+                  : 'All Taken';
+                currentSubLabel = nextMed 
+                  ? `${nextMed.name}${nextMed.dosage ? ` • ${nextMed.dosage}` : ''}`
+                  : 'No pending meds';
+              }
 
               return (
                 <TouchableOpacity 
@@ -113,20 +152,30 @@ const DashboardScreen = ({ route, navigation }) => {
                   style={styles.vitalCard}
                   onPress={() => {
                     if (isBP) setBpModalVisible(true);
+                    if (isMedication) navigation.navigate('MedicineTracker');
                     if (isSleep) {
                       // In future iterations we can show a detailed sleep graph modal here
                     }
                   }}
-                  activeOpacity={(isBP || isSleep) ? 0.7 : 1}
+                  activeOpacity={(isBP || isSleep || isMedication) ? 0.7 : 1}
                 >
                   <View style={styles.vitalHeaderRow}>
-                    <Text style={styles.vitalIcon}>{vital.icon}</Text>
+                    {isMedication ? (
+                      <Animated.View style={{ opacity: currentUpcoming ? pulseAnim : 1, marginRight: 8 }}>
+                         <Pill size={20} color={vital.color} />
+                      </Animated.View>
+                    ) : (
+                      <Text style={styles.vitalIcon}>{vital.icon}</Text>
+                    )}
                     <Text style={styles.vitalValue}>{displayValue}</Text>
                   </View>
-                  {/* Visual Indicator Placeholder */}
-                  <View style={[styles.vitalBarContainer, { backgroundColor: `${vital.color}20` }]}>
-                    <View style={[styles.vitalBarFill, { backgroundColor: vital.color, width: '70%' }]} />
-                  </View>
+                  {isMedication && currentSubLabel ? (
+                    <Text style={styles.vitalSubLabel} numberOfLines={1}>{currentSubLabel}</Text>
+                  ) : (
+                    <View style={[styles.vitalBarContainer, { backgroundColor: `${vital.color}20` }]}>
+                      <View style={[styles.vitalBarFill, { backgroundColor: vital.color, width: '70%' }]} />
+                    </View>
+                  )}
                   <Text style={styles.vitalLabel}>{vital.label.toUpperCase()}</Text>
                   {isBP && <Text style={{fontSize: 10, color: THEME.colors.primary, marginTop: 4, fontWeight: 'bold'}}>+ LOG</Text>}
                   {isSleep && <Text style={{fontSize: 10, color: THEME.colors.textMuted, marginTop: 4, fontWeight: '600'}}>AUTO</Text>}
@@ -244,6 +293,7 @@ const styles = StyleSheet.create({
   vitalBarContainer: { height: 6, borderRadius: 3, width: '100%', marginBottom: 10 },
   vitalBarFill: { height: '100%', borderRadius: 3 },
   vitalLabel: { ...THEME.typography.label, fontSize: 10 },
+  vitalSubLabel: { ...THEME.typography.label, color: THEME.colors.textMuted, marginBottom: 10, fontSize: 12 },
 
   // Activity Feed Styles
   activitySection: { marginBottom: 28 },
