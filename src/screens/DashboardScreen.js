@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { getCircleDetails } from '../services/circleApi';
+import { getSleepLogs } from '../services/sleepApi';
+import { getVitals } from '../services/vitalsApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
 import LogBloodPressureModal from './home/LogBloodPressureModal';
@@ -26,9 +28,17 @@ const DashboardScreen = ({ route, navigation }) => {
   const [members, setMembers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bpModalVisible, setBpModalVisible] = useState(false);
-  const { bloodPressureLogs } = useStore();
+  const { bloodPressureLogs, sleepLogs, setBloodPressureLogs, setSleepLogs } = useStore();
   
-  const latestBp = bloodPressureLogs && bloodPressureLogs.length > 0 ? `${bloodPressureLogs[0].systolic}/${bloodPressureLogs[0].diastolic}` : '120/80';
+  const latestBp = bloodPressureLogs && bloodPressureLogs.length > 0 ? `${bloodPressureLogs[0].systolic}/${bloodPressureLogs[0].diastolic}` : '--/--';
+  
+  const formatDuration = (minutes) => {
+    if (!minutes) return '--h --m';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    return `${h}h ${m}m`;
+  };
+  const latestSleep = sleepLogs && sleepLogs.length > 0 ? formatDuration(sleepLogs[0].duration_minutes) : '--h --m';
 
   useFocusEffect(
     useCallback(() => {
@@ -48,11 +58,19 @@ const DashboardScreen = ({ route, navigation }) => {
   const fetchCircleData = async () => {
     setIsLoading(true);
     try {
-      const data = await getCircleDetails(circleId);
-      setMembers(data.members || []);
+      // Run API calls in parallel for better performance
+      const [circleData, sleepData, vitalsData] = await Promise.all([
+        getCircleDetails(circleId),
+        getSleepLogs(circleId),
+        getVitals(circleId)
+      ]);
+      
+      setMembers(circleData.members || []);
+      setSleepLogs(sleepData || []);
+      setBloodPressureLogs(vitalsData || []);
     } catch (error) {
-      console.error('Failed to fetch circle details', error);
-      Alert.alert('Error', 'Failed to load circle details');
+      console.error('Failed to fetch dashboard data', error);
+      Alert.alert('Error', 'Failed to load some dashboard details');
     } finally {
       setIsLoading(false);
     }
@@ -83,18 +101,27 @@ const DashboardScreen = ({ route, navigation }) => {
           <View style={styles.vitalsGrid}>
             {mockVitals.map(vital => {
               const isBP = vital.label === 'Blood Pressure';
+              const isSleep = vital.label === 'Sleep';
+              
+              let displayValue = vital.value;
+              if (isBP && bloodPressureLogs?.length > 0) displayValue = latestBp;
+              if (isSleep && sleepLogs?.length > 0) displayValue = latestSleep;
+
               return (
                 <TouchableOpacity 
                   key={vital.id} 
                   style={styles.vitalCard}
                   onPress={() => {
                     if (isBP) setBpModalVisible(true);
+                    if (isSleep) {
+                      // In future iterations we can show a detailed sleep graph modal here
+                    }
                   }}
-                  activeOpacity={isBP ? 0.7 : 1}
+                  activeOpacity={(isBP || isSleep) ? 0.7 : 1}
                 >
                   <View style={styles.vitalHeaderRow}>
                     <Text style={styles.vitalIcon}>{vital.icon}</Text>
-                    <Text style={styles.vitalValue}>{isBP && bloodPressureLogs?.length > 0 ? latestBp : vital.value}</Text>
+                    <Text style={styles.vitalValue}>{displayValue}</Text>
                   </View>
                   {/* Visual Indicator Placeholder */}
                   <View style={[styles.vitalBarContainer, { backgroundColor: `${vital.color}20` }]}>
@@ -102,6 +129,7 @@ const DashboardScreen = ({ route, navigation }) => {
                   </View>
                   <Text style={styles.vitalLabel}>{vital.label.toUpperCase()}</Text>
                   {isBP && <Text style={{fontSize: 10, color: THEME.colors.primary, marginTop: 4, fontWeight: 'bold'}}>+ LOG</Text>}
+                  {isSleep && <Text style={{fontSize: 10, color: THEME.colors.textMuted, marginTop: 4, fontWeight: '600'}}>AUTO</Text>}
                 </TouchableOpacity>
               );
             })}

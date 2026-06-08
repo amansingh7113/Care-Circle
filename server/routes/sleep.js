@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
-
 const jwt = require('jsonwebtoken');
 
 // Initialize Supabase Client
@@ -33,13 +32,13 @@ const authenticate = async (req, res, next) => {
 
 router.use(authenticate);
 
-// GET vitals for a circle
+// GET sleep logs for a circle
 router.get('/:circleId', async (req, res) => {
   try {
     const { circleId } = req.params;
     
     const { data, error } = await supabase
-      .from('blood_pressure_logs')
+      .from('sleep_logs')
       .select('*')
       .eq('circle_id', circleId)
       .order('logged_at', { ascending: false });
@@ -47,26 +46,26 @@ router.get('/:circleId', async (req, res) => {
     if (error) throw error;
     res.status(200).json(data);
   } catch (error) {
-    console.error('Error fetching vitals:', error);
-    res.status(500).json({ error: 'Failed to fetch vitals' });
+    console.error('Error fetching sleep logs:', error);
+    res.status(500).json({ error: 'Failed to fetch sleep logs' });
   }
 });
 
-// POST new blood pressure log
+// POST new sleep log (Called by the App or Background Process)
 router.post('/', async (req, res) => {
   try {
-    const { circle_id, systolic, diastolic, pulse, image_url } = req.body;
+    const { circle_id, sleep_start, sleep_end, duration_minutes, is_auto_detected } = req.body;
     const patient_id = req.user.id;
 
     const { data, error } = await supabase
-      .from('blood_pressure_logs')
+      .from('sleep_logs')
       .insert([{
         circle_id,
         patient_id,
-        systolic,
-        diastolic,
-        pulse,
-        image_url
+        sleep_start,
+        sleep_end,
+        duration_minutes,
+        is_auto_detected
       }])
       .select()
       .single();
@@ -74,8 +73,8 @@ router.post('/', async (req, res) => {
     if (error) throw error;
     res.status(201).json(data);
   } catch (error) {
-    console.error('Error adding vital log:', error);
-    res.status(500).json({ error: 'Failed to add vital log' });
+    console.error('Error adding sleep log:', error);
+    res.status(500).json({ error: 'Failed to add sleep log' });
   }
 });
 

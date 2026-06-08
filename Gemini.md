@@ -40,6 +40,7 @@
 3. **Doctor Visit Log:** Build the timeline view and the Supabase Storage logic for prescription/report attachments.[cite: 3]
 4. **Expense Tracker:** Implement the monthly spend view and budget progress bar (No individual splitting logic).[cite: 3]
 5. **Vitals Tracking:** Implement Blood Pressure logging with on-device text recognition for auto-filling readings from monitor images.
+6. **Sleep Tracking:** Implement automatic background sleep detection utilizing Android Sleep API (Activity Recognition).
 
 ### Phase 3: Dashboard & Role Logic
 1. **Dashboard:** Aggregate data from all modules into a single `GET /dashboard` endpoint for high performance.[cite: 3]
