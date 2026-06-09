@@ -21,8 +21,10 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "com.google.android.gms.permission.ACTIVITY_RECOGNITION",
         "com.google.android.gms.permission.ACTIVITY_RECOGNITION"
-      ]
+      ],
+      "package": "com.anonymous.carecircle"
     },
     "web": {},
     "plugins": [

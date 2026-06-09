@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Modal, SafeAreaView, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Modal, SafeAreaView, Image, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { logVitals } from '../../services/vitalsApi';
@@ -24,16 +24,25 @@ const LogBloodPressureModal = ({ visible, onClose }) => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
+        let uri = result.assets[0].uri;
+        
+        if (Platform.OS === 'android' && !uri.startsWith('file://')) {
+          uri = `file://${uri}`;
+        }
+
         setIsProcessing(true);
-        const uri = result.assets[0].uri;
         setImageUri(uri);
         
+        if (!TextRecognition || !TextRecognition.recognize) {
+          throw new Error("ML Kit native module is not linked. Did you run 'npx expo run:android'?");
+        }
+
         // Process image with ML Kit Text Recognition
         const recognizedText = await TextRecognition.recognize(uri);
         
@@ -65,8 +74,8 @@ const LogBloodPressureModal = ({ visible, onClose }) => {
         }
       }
     } catch (error) {
-      console.error(error);
-      Alert.alert('Error', 'Failed to process image');
+      console.error('BP Scanner OCR Error:', error);
+      Alert.alert('Scanner Error', error.message || 'Failed to process image');
     } finally {
       setIsProcessing(false);
     }

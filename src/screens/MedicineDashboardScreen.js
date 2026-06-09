@@ -64,15 +64,26 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
-        const uri = result.assets[0].uri;
+        let uri = result.assets[0].uri;
+        
+        // Ensure proper URI formatting for Android ML Kit
+        if (Platform.OS === 'android' && !uri.startsWith('file://')) {
+          uri = `file://${uri}`;
+        }
+        
         setIsSubmitting(true);
         
+        if (!TextRecognition || !TextRecognition.recognize) {
+           throw new Error("ML Kit native module is not linked. Did you run 'npx expo run:android'?");
+        }
+
+        // Use ML Kit to recognize text
         const recognizedText = await TextRecognition.recognize(uri);
         const textBlocks = recognizedText.blocks.map(b => b.text).join(' ');
 
@@ -106,7 +117,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       }
     } catch (error) {
       console.log('OCR Error', error);
-      Alert.alert('Error', 'Failed to process image text.');
+      Alert.alert('Scanner Error', error.message || 'Failed to process image');
     } finally {
       setIsSubmitting(false);
     }
@@ -162,9 +173,8 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       const payload = {
         name: formData.name,
         dosage: `${formData.dosage}${formData.unit !== 'pills' ? formData.unit : ''}`.trim(),
-        instructions: {
-          scheduled_times: formData.scheduled_times,
-        },
+        frequency: 'Daily',
+        scheduled_times: formData.scheduled_times,
         stock_quantity: stock,
         refill_alert_threshold: automatedRefillThreshold
       };
@@ -261,7 +271,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
           <View style={[styles.modalContent, { maxHeight: '90%' }]}>
             <Text style={styles.modalTitle}>Add New Medicine</Text>
             
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
               <View style={[styles.inputGroup, { zIndex: 10 }]}>
                 <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8}}>
                   <Text style={[styles.label, { marginBottom: 0 }]}>Medicine Name</Text>
@@ -282,7 +292,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
                 />
                 {showSuggestions && filteredMedicines.length > 0 && (
                   <View style={styles.suggestionsContainer}>
-                    <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled={true}>
+                    <ScrollView keyboardShouldPersistTaps="always" nestedScrollEnabled={true}>
                       {filteredMedicines.map((med, idx) => (
                         <TouchableOpacity key={idx} style={styles.suggestionItem} onPress={() => selectSuggestion(med)}>
                           <Text style={styles.suggestionText}>{med}</Text>
@@ -535,7 +545,8 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: THEME.colors.border,
     borderRadius: THEME.borderRadius.input,
     maxHeight: 150,
-    position: 'absolute', top: 75, left: 0, right: 0, zIndex: 10,
+    position: 'absolute', top: 75, left: 0, right: 0, 
+    zIndex: 9999, elevation: 9999,
     ...THEME.shadows.soft
   },
   suggestionItem: {

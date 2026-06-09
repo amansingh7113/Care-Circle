@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Pill } from 'lucide-react-native';
@@ -82,16 +83,16 @@ const DashboardScreen = ({ route, navigation }) => {
     try {
       // Run API calls in parallel for better performance
       const [circleData, sleepData, vitalsData, medsData] = await Promise.all([
-        getCircleDetails(circleId),
-        getSleepLogs(circleId),
-        getVitals(circleId),
+        getCircleDetails(circleId).catch(() => ({ members: [] })),
+        getSleepLogs(circleId).catch(() => []),
+        getVitals(circleId).catch(() => []),
         getMedicines(circleId).catch(() => ({ medicines: [] }))
       ]);
       
-      setMembers(circleData.members || []);
-      setSleepLogs(sleepData || []);
-      setBloodPressureLogs(vitalsData || []);
-      setMedicines(medsData.medicines || medsData || []);
+      setMembers(circleData?.members || []);
+      setSleepLogs(Array.isArray(sleepData) ? sleepData : []);
+      setBloodPressureLogs(Array.isArray(vitalsData) ? vitalsData : []);
+      setMedicines(medsData?.medicines || (Array.isArray(medsData) ? medsData : []));
     } catch (error) {
       console.error('Failed to fetch dashboard data', error);
       Alert.alert('Error', 'Failed to load some dashboard details');
@@ -135,7 +136,7 @@ const DashboardScreen = ({ route, navigation }) => {
               if (isBP && bloodPressureLogs?.length > 0) displayValue = latestBp;
               if (isSleep && sleepLogs?.length > 0) displayValue = latestSleep;
               if (isMedication) {
-                const pendingMeds = medicines.filter(m => m.status !== 'taken');
+                const pendingMeds = (medicines || []).filter(m => m.status !== 'taken');
                 const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
                 currentUpcoming = !!nextMed;
                 displayValue = nextMed 
