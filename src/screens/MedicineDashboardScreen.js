@@ -5,7 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { COMMON_MEDICINES } from '../utils/commonMedicines';
-import { getMedicines, logAdministration, addMedicine } from '../services/medicineApi';
+import { getMedicines, logAdministration, addMedicine, deleteMedicine } from '../services/medicineApi';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
 import { THEME } from '../styles/theme';
@@ -29,6 +29,8 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
     name: '',
     dosage: '',
     unit: 'mg',
+    frequency: 'Daily',
+    days: [],
     scheduled_times: [],
     stock_quantity: '30'
   });
@@ -144,18 +146,38 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleLog = async (id, status) => {
+  const handleLog = async (item, status) => {
     // Optimistic update
     const previousMedicines = [...medicines];
-    setMedicines(prev => prev.map(m => m.id === id ? { ...m, status } : m));
+    setMedicines(prev => prev.map(m => m.slot_id === item.slot_id ? { ...m, status } : m));
     try {
-      await logAdministration(id, status);
+      await logAdministration(item.id, status, item.scheduled_time);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      fetchMedicines(); // Refresh to get attribution
     } catch (error) {
       console.log('Failed to log administration', error);
       Alert.alert('Error', 'Failed to update medicine status.');
       setMedicines(previousMedicines); // Revert optimistic update
     }
+  };
+
+  const handleDelete = (id) => {
+    Alert.alert('Delete Medicine', 'Are you sure you want to permanently delete this medicine?', [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Delete', 
+        style: 'destructive', 
+        onPress: async () => {
+          try {
+            await deleteMedicine(id);
+            setMedicines(prev => prev.filter(m => m.id !== id));
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete medicine');
+          }
+        }
+      }
+    ]);
   };
 
   const handleAddMedicine = async () => {
@@ -173,19 +195,20 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       const payload = {
         name: formData.name,
         dosage: `${formData.dosage}${formData.unit !== 'pills' ? formData.unit : ''}`.trim(),
-        frequency: 'Daily',
+        frequency: formData.frequency,
+        days: formData.frequency === 'Specific Days' ? formData.days : [],
         scheduled_times: formData.scheduled_times,
         stock_quantity: stock,
         refill_alert_threshold: automatedRefillThreshold
       };
 
-      const newMed = await addMedicine(circleId, payload);
-      setMedicines(prev => [...prev, newMed.medicine || newMed]);
+      await addMedicine(circleId, payload);
       setModalVisible(false);
-      setFormData({ name: '', dosage: '', unit: 'mg', scheduled_times: [], stock_quantity: '30' });
+      setFormData({ name: '', dosage: '', unit: 'mg', frequency: 'Daily', days: [], scheduled_times: [], stock_quantity: '30' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Success', 'Medicine added successfully');
-      fetchMedicines(); // refresh just in case
+      fetchMedicines(); // refresh
+
     } catch (error) {
       console.log('Failed to add medicine', error);
       Alert.alert('Error', 'Failed to add medicine. Please try again.');
@@ -194,34 +217,61 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
     }
   };
 
-  const renderMedicine = ({ item }) => (
-    <View style={styles.card}>
-      <View style={styles.cardContent}>
-        <View style={styles.cardInfo}>
-          <Text style={styles.medName}>{item.name}</Text>
-          <Text style={styles.medDetails}>Taken: {item.time || (item.instructions?.scheduled_times ? item.instructions.scheduled_times.join(', ') : 'Scheduled')}</Text>
-          {item.shape && <Text style={styles.medDetails}>Shape {item.shape}</Text>}
-        </View>
-        <View style={styles.pillIconContainer}>
-          <Text style={styles.pillIcon}>💊</Text>
-        </View>
-      </View>
-      
-      {item.status === 'taken' ? (
-        <View style={styles.takenStateContainer}>
-          <Text style={styles.medDetails}>Completed</Text>
-          <View style={styles.takenBadgeRow}>
-            <Ionicons name="checkmark-circle" size={20} color={THEME.colors.primary} />
-            <Text style={styles.takenBadgeText}>Taken</Text>
+  const renderMedicine = ({ item }) => {
+    let freqLabel = 'Daily';
+    try {
+      const instr = typeof item.instructions === 'string' ? JSON.parse(item.instructions) : item.instructions;
+      freqLabel = instr?.frequency || 'Daily';
+      if (freqLabel === 'Specific Days' && instr?.days) {
+        freqLabel = instr.days.join(', ');
+      }
+    } catch(e){}
+
+    return (
+      <TouchableOpacity 
+        style={styles.card} 
+        activeOpacity={0.9} 
+        onLongPress={() => handleDelete(item.id)}
+      >
+        <View style={styles.cardContent}>
+          <View style={styles.cardInfo}>
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4}}>
+              <Text style={styles.medName}>{item.name}</Text>
+              <TouchableOpacity onPress={() => handleDelete(item.id)} style={{padding: 4}}>
+                <Ionicons name="trash-outline" size={20} color={THEME.colors.alert} />
+              </TouchableOpacity>
+            </View>
+            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
+              <Ionicons name="time-outline" size={14} color={THEME.colors.textMuted} style={{marginRight: 4}} />
+              <Text style={styles.medTimeText}>{item.scheduled_time || 'Anytime'}</Text>
+              <View style={styles.freqBadge}>
+                <Text style={styles.freqBadgeText}>{freqLabel}</Text>
+              </View>
+            </View>
+            {item.shape && <Text style={styles.medDetails}>Shape {item.shape}</Text>}
           </View>
         </View>
-      ) : (
-        <TouchableOpacity style={styles.actionBtn} onPress={() => handleLog(item.id, 'taken')}>
-          <Text style={styles.btnText}>Mark as Taken</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+        
+        {item.status === 'taken' ? (
+          <View style={styles.takenStateContainer}>
+            {item.logged_by_name ? (
+              <Text style={styles.medDetails}>By {item.logged_by_name}</Text>
+            ) : (
+              <Text style={styles.medDetails}>Completed</Text>
+            )}
+            <View style={styles.takenBadgeRow}>
+              <Ionicons name="checkmark-circle" size={20} color={THEME.colors.primary} />
+              <Text style={styles.takenBadgeText}>Taken</Text>
+            </View>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.actionBtn} onPress={() => handleLog(item, 'taken')}>
+            <Text style={styles.btnText}>Mark as Taken</Text>
+          </TouchableOpacity>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -237,9 +287,14 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.header}>MEDICINE TRACKER</Text>
-        <TouchableOpacity onPress={() => setModalVisible(true)}>
-          <Ionicons name="add-circle" size={36} color={THEME.colors.primary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <TouchableOpacity onPress={() => navigation.navigate('MedicineAnalytics')} style={{ marginRight: 16 }}>
+            <Ionicons name="pie-chart" size={32} color={THEME.colors.primary} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setModalVisible(true)}>
+            <Ionicons name="add-circle" size={36} color={THEME.colors.primary} />
+          </TouchableOpacity>
+        </View>
       </View>
       
       {medicines.length === 0 ? (
@@ -251,7 +306,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       ) : (
         <FlatList
           data={medicines}
-          keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+          keyExtractor={(item) => item.slot_id || item.id?.toString() || Math.random().toString()}
           renderItem={renderMedicine}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -332,51 +387,93 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Scheduled Times</Text>
+                <Text style={styles.label}>Frequency</Text>
                 <View style={styles.timesContainer}>
-                  {formData.scheduled_times.map((t, idx) => (
-                    <View key={idx} style={styles.timeTag}>
-                      <Text style={styles.timeTagText}>{t}</Text>
-                      <TouchableOpacity onPress={() => {
-                        setFormData(prev => ({
-                          ...prev,
-                          scheduled_times: prev.scheduled_times.filter((_, i) => i !== idx)
-                        }));
-                      }}>
-                        <Ionicons name="close-circle" size={20} color={THEME.colors.white} style={{marginLeft: 6}} />
-                      </TouchableOpacity>
-                    </View>
+                  {['Daily', 'Specific Days', 'As Needed'].map(freq => (
+                    <TouchableOpacity 
+                      key={freq} 
+                      style={[styles.freqChip, formData.frequency === freq && styles.freqChipActive]}
+                      onPress={() => setFormData({...formData, frequency: freq})}
+                    >
+                      <Text style={[styles.freqChipText, formData.frequency === freq && styles.freqChipTextActive]}>{freq}</Text>
+                    </TouchableOpacity>
                   ))}
-                  <TouchableOpacity style={styles.addTimeBtn} onPress={() => setShowTimePicker(true)}>
-                    <Ionicons name="time-outline" size={20} color={THEME.colors.primary} />
-                    <Text style={styles.addTimeBtnText}>Add Time</Text>
-                  </TouchableOpacity>
                 </View>
-                
-                {showTimePicker && (
-                  <DateTimePicker
-                    value={new Date()}
-                    mode="time"
-                    display="default"
-                    onChange={(event, selectedDate) => {
-                      setShowTimePicker(Platform.OS === 'ios');
-                      if (event.type === 'set' && selectedDate) {
-                        const hours = selectedDate.getHours().toString().padStart(2, '0');
-                        const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
-                        const timeStr = `${hours}:${minutes}`;
-                        if (!formData.scheduled_times.includes(timeStr)) {
+              </View>
+
+              {formData.frequency === 'Specific Days' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Select Days</Text>
+                  <View style={{flexDirection: 'row', justifyContent: 'space-between', marginTop: 8}}>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => {
+                      const isSelected = formData.days.includes(day);
+                      return (
+                        <TouchableOpacity 
+                          key={day}
+                          style={[styles.dayCircle, isSelected && styles.dayCircleActive]}
+                          onPress={() => {
+                            const newDays = isSelected 
+                              ? formData.days.filter(d => d !== day)
+                              : [...formData.days, day];
+                            setFormData({...formData, days: newDays});
+                          }}
+                        >
+                          <Text style={[styles.dayCircleText, isSelected && styles.dayCircleTextActive]}>{day[0]}</Text>
+                        </TouchableOpacity>
+                      )
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {formData.frequency !== 'As Needed' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Scheduled Times</Text>
+                  <View style={styles.timesContainer}>
+                    {formData.scheduled_times.map((t, idx) => (
+                      <View key={idx} style={styles.timeTag}>
+                        <Text style={styles.timeTagText}>{t}</Text>
+                        <TouchableOpacity onPress={() => {
                           setFormData(prev => ({
                             ...prev,
-                            scheduled_times: [...prev.scheduled_times, timeStr].sort()
+                            scheduled_times: prev.scheduled_times.filter((_, i) => i !== idx)
                           }));
+                        }}>
+                          <Ionicons name="close-circle" size={20} color={THEME.colors.white} style={{marginLeft: 6}} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    <TouchableOpacity style={styles.addTimeBtn} onPress={() => setShowTimePicker(true)}>
+                      <Ionicons name="time-outline" size={20} color={THEME.colors.primary} />
+                      <Text style={styles.addTimeBtnText}>Add Time</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {showTimePicker && (
+                    <DateTimePicker
+                      value={new Date()}
+                      mode="time"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowTimePicker(Platform.OS === 'ios');
+                        if (event.type === 'set' && selectedDate) {
+                          const hours = selectedDate.getHours().toString().padStart(2, '0');
+                          const minutes = selectedDate.getMinutes().toString().padStart(2, '0');
+                          const timeStr = `${hours}:${minutes}`;
+                          if (!formData.scheduled_times.includes(timeStr)) {
+                            setFormData(prev => ({
+                              ...prev,
+                              scheduled_times: [...prev.scheduled_times, timeStr].sort()
+                            }));
+                          }
+                        } else {
+                          setShowTimePicker(false);
                         }
-                      } else {
-                        setShowTimePicker(false);
-                      }
-                    }}
-                  />
-                )}
-              </View>
+                      }}
+                    />
+                  )}
+                </View>
+              )}
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Total Stock (Number of Pills/Units)</Text>
@@ -585,6 +682,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
+  medTimeText: {
+    ...THEME.typography.subtext,
+    color: THEME.colors.textHeader,
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  freqBadge: {
+    backgroundColor: `${THEME.colors.primary}20`,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  freqBadgeText: {
+    color: THEME.colors.primary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  freqChip: {
+    borderWidth: 1, borderColor: THEME.colors.border,
+    paddingHorizontal: 12, paddingVertical: 8, 
+    borderRadius: 20, marginRight: 8, marginBottom: 8 
+  },
+  freqChipActive: {
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
+  },
+  freqChipText: { color: THEME.colors.textMuted, fontWeight: '600' },
+  freqChipTextActive: { color: THEME.colors.white },
+  dayCircle: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: THEME.colors.surface,
+    justifyContent: 'center', alignItems: 'center'
+  },
+  dayCircleActive: {
+    backgroundColor: THEME.colors.primary,
+  },
+  dayCircleText: {
+    color: THEME.colors.textMuted, fontWeight: 'bold'
+  },
+  dayCircleTextActive: {
+    color: THEME.colors.white
+  }
 });
 
 export default MedicineDashboardScreen;

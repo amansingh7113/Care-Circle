@@ -72,7 +72,19 @@ async function checkMissedDoses() {
       const yesterday = new Date();
       yesterday.setDate(today.getDate() - 1);
 
-      const daysToCheck = [yesterday, today];
+      const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const frequency = instructions.frequency || 'Daily';
+      const scheduledDays = instructions.days || [];
+
+      const daysToCheck = [yesterday, today].filter(day => {
+        if (frequency === 'Specific Days') {
+          return scheduledDays.includes(daysOfWeek[day.getDay()]);
+        }
+        if (frequency === 'As Needed') {
+          return false;
+        }
+        return true;
+      });
 
       for (const day of daysToCheck) {
         for (const timeStr of scheduledTimes) {
@@ -89,38 +101,27 @@ async function checkMissedDoses() {
         return now > gracePeriodEnd;
       });
 
-      // For each passed dose, do we have a log near that time?
-      // Since we just count logs previously, we need to match them.
-      // A simple heuristic: find the closest log within +/- 12 hours that hasn't been matched yet.
-      const unmatchedLogs = [...medLogs];
-
       for (const dose of passedDoses) {
-        // Find if any log exists for this specific day
+        // Find if any log exists for this specific day AND time slot
         const doseDayStart = new Date(dose.dateObj);
         doseDayStart.setHours(0, 0, 0, 0);
         const doseDayEnd = new Date(dose.dateObj);
         doseDayEnd.setHours(23, 59, 59, 999);
 
-        const logIndex = unmatchedLogs.findIndex(l => {
+        const logExists = medLogs.some(l => {
           const logTime = new Date(l.taken_at);
-          return logTime >= doseDayStart && logTime <= doseDayEnd;
+          const isSameDay = logTime >= doseDayStart && logTime <= doseDayEnd;
+          const isSameSlot = l.scheduled_time === dose.timeStr || !l.scheduled_time; // Fallback for legacy logs
+          return isSameDay && isSameSlot;
         });
 
-        if (logIndex !== -1) {
-          // Found a log for this day, mark it as matched
-          unmatchedLogs.splice(logIndex, 1);
-        } else {
-          // No log found for this day, so this dose was missed!
-          // BUT wait, if we schedule 2 times a day, we need 2 logs per day.
-          // The findIndex above matches the FIRST available log for the day.
-          // If a second dose is checked, it will find the SECOND available log for the day.
-          // This perfectly mimics the "count" logic but bound to the exact day!
-
+        if (!logExists) {
           newLogsToInsert.push({
             medicine_id: med.id,
             circle_id: med.circle_id,
             status: 'missed',
             taken_at: dose.dateObj.toISOString(),
+            scheduled_time: dose.timeStr,
             logged_by: null // System generated
           });
           console.log(`[Cron] Flagging missed dose for Medicine: ${med.name} (Circle: ${med.circle_id}) at ${dose.timeStr} on ${dose.dateObj.toDateString()}`);

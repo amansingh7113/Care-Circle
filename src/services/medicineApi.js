@@ -42,8 +42,8 @@ export const addMedicine = async (circleId, data) => {
   return response.data;
 };
 
-export const logAdministration = async (medicineId, status) => {
-  const response = await medicineApi.post(`/${medicineId}/logs`, { status });
+export const logAdministration = async (medicineId, status, scheduledTime) => {
+  const response = await medicineApi.post(`/${medicineId}/logs`, { status, scheduled_time: scheduledTime });
   return response.data;
 };
 
@@ -52,9 +52,15 @@ export const getMedicineAnalytics = async () => {
   return response.data;
 };
 
+export const deleteMedicine = async (medicineId) => {
+  const response = await medicineApi.delete(`/${medicineId}`);
+  return response.data;
+};
+
 export default {
   getMedicines,
   addMedicine,
   logAdministration,
   getMedicineAnalytics,
+  deleteMedicine,
 };
