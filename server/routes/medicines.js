@@ -71,6 +71,7 @@ router.post('/', async (req, res) => {
     .single();
 
   if (error) {
+    console.error('Add medicine error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -92,6 +93,7 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
     .eq('circle_id', circleId);
 
   if (error) {
+    console.error('Get medicines error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -221,6 +223,7 @@ router.post('/:id/logs', async (req, res) => {
     .single();
 
   if (error) {
+    console.error('Log medicine error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -253,6 +256,7 @@ router.get('/:id/logs', async (req, res) => {
     .order('created_at', { ascending: false });
 
   if (error) {
+    console.error('Get medicine logs error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -287,6 +291,7 @@ router.delete('/:id', async (req, res) => {
     .eq('id', medicine_id);
 
   if (error) {
+    console.error('Delete medicine error:', error);
     return res.status(400).json({ error: error.message });
   }
 

@@ -61,6 +61,7 @@ router.post('/', async (req, res) => {
     if (error) throw error;
     res.status(201).json({ data: data[0] });
   } catch (err) {
+    console.error('Add doctor visit error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -87,6 +88,7 @@ router.get('/', async (req, res) => {
     if (error) throw error;
     res.status(200).json({ data });
   } catch (err) {
+    console.error('Get doctor visits error:', err);
     res.status(500).json({ error: err.message });
   }
 });

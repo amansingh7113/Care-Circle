@@ -37,6 +37,7 @@ router.get('/', async (req, res) => {
     .eq('id', user_id);
 
   if (error) {
+    console.error('Fetch circles error:', error);
     return res.status(500).json({ error: error.message });
   }
 
@@ -66,6 +67,7 @@ router.post('/', async (req, res) => {
     .single();
 
   if (circleError) {
+    console.error('Create circle error:', circleError);
     return res.status(500).json({ error: circleError.message });
   }
 
@@ -80,6 +82,7 @@ router.post('/', async (req, res) => {
     }]);
 
   if (userError) {
+    console.error('Upsert user admin role error:', userError);
     return res.status(500).json({ error: userError.message });
   }
 
@@ -107,6 +110,7 @@ router.get('/:id', async (req, res) => {
     .single();
 
   if (circleError) {
+    console.error('Get circle error:', circleError);
     return res.status(404).json({ error: 'Circle not found' });
   }
 
@@ -116,6 +120,7 @@ router.get('/:id', async (req, res) => {
     .eq('circle_id', id);
 
   if (membersError) {
+    console.error('Get circle members error:', membersError);
     return res.status(500).json({ error: membersError.message });
   }
 
@@ -178,6 +183,7 @@ router.post('/join', async (req, res) => {
       .single();
 
     if (circleError) {
+      console.error('Join circle check error:', circleError);
       return res.status(404).json({ error: 'Circle not found' });
     }
 
@@ -192,6 +198,7 @@ router.post('/join', async (req, res) => {
       }]);
 
     if (userError) {
+      console.error('Join circle user upsert error:', userError);
       return res.status(500).json({ error: userError.message });
     }
 
@@ -202,6 +209,7 @@ router.post('/join', async (req, res) => {
     });
 
   } catch (err) {
+    console.error('Join circle catch error:', err);
     return res.status(400).json({ error: 'Invalid or expired invite code' });
   }
 });

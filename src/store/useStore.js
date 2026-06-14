@@ -13,6 +13,7 @@ export const useStore = create(
       dailyTasks: [],
       bloodPressureLogs: [],
       sleepLogs: [],
+      stepLogs: [],
       emailAuthLoading: false,
       emailAuthError: null,
       medicineAnalytics: null,
@@ -25,6 +26,7 @@ export const useStore = create(
       setBloodPressureLogs: (logs) => set({ bloodPressureLogs: logs }),
       addBloodPressureLog: (log) => set((state) => ({ bloodPressureLogs: [log, ...state.bloodPressureLogs] })),
       setSleepLogs: (logs) => set({ sleepLogs: logs }),
+      setStepLogs: (logs) => set({ stepLogs: logs }),
       updateTaskStatus: (taskId, status) => set((state) => ({
         dailyTasks: state.dailyTasks.map(task =>
           task.id === taskId ? { ...task, status } : task

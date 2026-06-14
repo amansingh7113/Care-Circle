@@ -27,11 +27,14 @@ const SettingsScreen = ({ navigation }) => {
     setIsLoadingCode(true);
     try {
       const token = useStore.getState().userSession;
-      const response = await axios.post(`${API_BASE_URL}/api/v1/circles/invite-code`, {}, {
+      const circleId = user?.circle_id || useStore.getState().currentCircle?.id;
+      if (!circleId) throw new Error('No circle selected');
+      
+      const response = await axios.post(`${API_BASE_URL}/api/v1/circles/${circleId}/invite`, { role: 'Caregiver' }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (response.data.code) {
-        setInviteCode(response.data.code);
+      if (response.data.inviteCode) {
+        setInviteCode(response.data.inviteCode);
       } else {
         setInviteCode('CC-K8X-9Q2');
       }

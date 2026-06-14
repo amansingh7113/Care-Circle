@@ -28,6 +28,9 @@ const doctorVisitsRouter = require('./routes/doctorVisits');
 const expensesRouter = require('./routes/expenses');
 const vitalsRouter = require('./routes/vitals');
 const sleepRouter = require('./routes/sleep');
+const stepsRouter = require('./routes/steps');
+const documentsRouter = require('./routes/documents');
+const insightsRouter = require('./routes/insights');
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/circles', circlesRouter);
 app.use('/api/v1/medicines', medicinesRouter);
@@ -36,6 +39,9 @@ app.use('/api/v1/doctor-visits', doctorVisitsRouter);
 app.use('/api/v1/expenses', expensesRouter);
 app.use('/api/v1/vitals', vitalsRouter);
 app.use('/api/v1/sleep', sleepRouter);
+app.use('/api/v1/steps', stepsRouter);
+app.use('/api/v1/documents', documentsRouter);
+app.use('/api/v1/insights', insightsRouter);
 // Dashboard Route (Placeholder)
 app.get('/dashboard', async (req, res) => {
   // TODO: Implement aggregation of medicines, tasks, and visits

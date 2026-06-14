@@ -5,6 +5,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useStore } from './src/store/useStore';
+import StepTrackerService from './src/components/StepTrackerService';
 
 export default function App() {
   const userSession = useStore((state) => state.userSession);
@@ -39,7 +40,10 @@ export default function App() {
       {userSession == null ? (
         <AuthNavigator />
       ) : (
-        <AppNavigator />
+        <>
+          <StepTrackerService />
+          <AppNavigator />
+        </>
       )}
     </NavigationContainer>
   );

@@ -9,6 +9,8 @@ import TaskBoardScreen from '../screens/TaskBoardScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
+import DocumentsScreen from '../screens/documents/DocumentsScreen';
+
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
@@ -27,6 +29,7 @@ const AppNavigator = () => {
       <Stack.Screen name="TaskBoard" component={TaskBoardScreen} />
       <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Documents" component={DocumentsScreen} />
     </Stack.Navigator>
   );
 };

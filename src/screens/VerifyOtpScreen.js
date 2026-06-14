@@ -28,7 +28,7 @@ const VerifyOtpScreen = ({ route, navigation }) => {
         throw new Error('No token received');
       }
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Verification failed');
+      Alert.alert('Error', error.response?.data?.error || error.response?.data?.message || 'Verification failed');
     } finally {
       setLoading(false);
     }

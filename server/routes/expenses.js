@@ -61,6 +61,7 @@ router.post('/', async (req, res) => {
     return res.status(201).json({ data: data[0] });
 
   } catch (err) {
+    console.error('Create expense error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -100,6 +101,7 @@ router.get('/summary', async (req, res) => {
     });
 
   } catch (err) {
+    console.error('Get expenses summary error:', err);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

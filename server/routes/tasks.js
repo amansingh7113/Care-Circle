@@ -65,6 +65,7 @@ router.post('/', async (req, res) => {
     .single();
 
   if (error) {
+    console.error('Create task error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -94,6 +95,7 @@ router.get('/circles/:circleId/tasks', async (req, res) => {
   const { data, error } = await query.order('due_date', { ascending: true });
 
   if (error) {
+    console.error('Get tasks error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -142,6 +144,7 @@ router.patch('/:id', async (req, res) => {
     .single();
 
   if (error) {
+    console.error('Update task error:', error);
     return res.status(400).json({ error: error.message });
   }
 
@@ -188,6 +191,7 @@ router.post('/:id/comments', async (req, res) => {
     .single();
 
   if (error) {
+    console.error('Add task comment error:', error);
     return res.status(400).json({ error: error.message });
   }
 

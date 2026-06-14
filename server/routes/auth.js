@@ -27,6 +27,7 @@ router.post('/send-otp', async (req, res) => {
 
     res.status(200).json({ success: true, message: 'OTP sent successfully', data });
   } catch (err) {
+    console.error('Send OTP error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -85,6 +86,7 @@ router.post('/verify-otp', async (req, res) => {
       session: authData.session
     });
   } catch (err) {
+    console.error('Verify OTP error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -108,6 +110,7 @@ router.get('/google', async (req, res) => {
 
     res.status(200).json({ url: data.url });
   } catch (err) {
+    console.error('Google OAuth error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -158,6 +161,7 @@ router.post('/exchange-session', async (req, res) => {
       user: profile
     });
   } catch (err) {
+    console.error('Exchange session error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -260,6 +264,7 @@ router.post('/register-email', async (req, res) => {
       session: authData.session
     });
   } catch (err) {
+    console.error('Register email error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -317,6 +322,7 @@ router.post('/login-email', async (req, res) => {
       session: authData.session
     });
   } catch (err) {
+    console.error('Login email error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

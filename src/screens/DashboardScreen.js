@@ -8,6 +8,7 @@ import { getCircleDetails } from '../services/circleApi';
 import { getSleepLogs } from '../services/sleepApi';
 import { getMedicines } from '../services/medicineApi';
 import { getVitals } from '../services/vitalsApi';
+import { getSteps } from '../services/stepApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
 import LogBloodPressureModal from './home/LogBloodPressureModal';
@@ -22,7 +23,7 @@ const mockActivities = [
 const mockVitals = [
   { id: '1', label: 'Blood Pressure', value: '120/80', icon: '❤️', color: THEME.colors.alert },
   { id: '2', label: 'Medication', value: 'In 30 Mins', icon: 'Pill', color: THEME.colors.primary, subLabel: 'Aspirin • 81mg', upcoming: true },
-  { id: '3', label: 'Hydration', value: '1.5L', icon: '💧', color: '#3BA0E3' }, // custom blue
+  { id: '3', label: 'Daily Steps', value: '0', icon: '👣', color: '#3BA0E3' }, // custom blue
   { id: '4', label: 'Sleep', value: '7h 20m', icon: '🌙', color: '#FCD34D' }, // custom yellow
 ];
 
@@ -32,7 +33,7 @@ const DashboardScreen = ({ route, navigation }) => {
   const [medicines, setMedicines] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bpModalVisible, setBpModalVisible] = useState(false);
-  const { bloodPressureLogs, sleepLogs, setBloodPressureLogs, setSleepLogs, user } = useStore();
+  const { bloodPressureLogs, sleepLogs, stepLogs, setBloodPressureLogs, setSleepLogs, setStepLogs, user } = useStore();
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const holdProgress = useRef(new Animated.Value(0)).current;
@@ -134,17 +135,19 @@ const DashboardScreen = ({ route, navigation }) => {
     setIsLoading(true);
     try {
       // Run API calls in parallel for better performance
-      const [circleData, sleepData, vitalsData, medsData] = await Promise.all([
+      const [circleData, sleepData, vitalsData, medsData, stepsData] = await Promise.all([
         getCircleDetails(circleId).catch(() => ({ members: [] })),
         getSleepLogs(circleId).catch(() => []),
         getVitals(circleId).catch(() => []),
-        getMedicines(circleId).catch(() => ({ medicines: [] }))
+        getMedicines(circleId).catch(() => ({ medicines: [] })),
+        getSteps(circleId).catch(() => [])
       ]);
       
       setMembers(circleData?.members || []);
       setSleepLogs(Array.isArray(sleepData) ? sleepData : []);
       setBloodPressureLogs(Array.isArray(vitalsData) ? vitalsData : []);
       setMedicines(medsData?.medicines || (Array.isArray(medsData) ? medsData : []));
+      setStepLogs(Array.isArray(stepsData) ? stepsData : []);
     } catch (error) {
       console.error('Failed to fetch dashboard data', error);
       Alert.alert('Error', 'Failed to load some dashboard details');
@@ -200,6 +203,7 @@ const DashboardScreen = ({ route, navigation }) => {
               const isBP = vital.label === 'Blood Pressure';
               const isSleep = vital.label === 'Sleep';
               const isMedication = vital.label === 'Medication';
+              const isSteps = vital.label === 'Daily Steps';
               
               let displayValue = vital.value;
               let currentSubLabel = vital.subLabel;
@@ -207,6 +211,11 @@ const DashboardScreen = ({ route, navigation }) => {
 
               if (isBP && bloodPressureLogs?.length > 0) displayValue = latestBp;
               if (isSleep && sleepLogs?.length > 0) displayValue = latestSleep;
+              if (isSteps) {
+                const today = new Date().toISOString().split('T')[0];
+                const todaySteps = stepLogs?.find(s => s.date === today)?.step_count || 0;
+                displayValue = `${todaySteps}`;
+              }
               if (isMedication) {
                 const pendingMeds = (medicines || []).filter(m => m.status !== 'taken');
                 const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
@@ -251,7 +260,7 @@ const DashboardScreen = ({ route, navigation }) => {
                   )}
                   <Text style={styles.vitalLabel}>{vital.label.toUpperCase()}</Text>
                   {isBP && <Text style={{fontSize: 10, color: THEME.colors.primary, marginTop: 4, fontWeight: 'bold'}}>+ LOG</Text>}
-                  {isSleep && <Text style={{fontSize: 10, color: THEME.colors.textMuted, marginTop: 4, fontWeight: '600'}}>AUTO</Text>}
+                  {(isSleep || isSteps) && <Text style={{fontSize: 10, color: THEME.colors.textMuted, marginTop: 4, fontWeight: '600'}}>AUTO</Text>}
                 </TouchableOpacity>
               );
             })}
@@ -303,6 +312,29 @@ const DashboardScreen = ({ route, navigation }) => {
             >
               <Text style={styles.buttonText}>Task Board</Text>
             </TouchableOpacity>
+          </View>
+          <View style={[styles.shortcutsRow, { marginTop: 12 }]}>
+            <TouchableOpacity 
+              style={[styles.shortcutButton, { backgroundColor: '#43A047' }]}
+              onPress={() => navigation.navigate('DoctorVisits')}
+            >
+              <Text style={styles.buttonText}>Doctor Visits</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.shortcutButton, { backgroundColor: '#E53935' }]}
+              onPress={() => navigation.navigate('Expenses')}
+            >
+              <Text style={styles.buttonText}>Expenses</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={[styles.shortcutsRow, { marginTop: 12 }]}>
+            <TouchableOpacity 
+              style={[styles.shortcutButton, { backgroundColor: '#FFB300' }]}
+              onPress={() => navigation.navigate('Documents')}
+            >
+              <Text style={styles.buttonText}>Documents Hub</Text>
+            </TouchableOpacity>
+            <View style={[styles.shortcutButton, { backgroundColor: 'transparent', elevation: 0 }]} />
           </View>
         </View>
         

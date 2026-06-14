@@ -83,7 +83,7 @@ const LoginScreen = ({ navigation }) => {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       navigation.navigate('VerifyOtp', { phone });
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to send verification code');
+      Alert.alert('Error', error.response?.data?.error || error.response?.data?.message || 'Failed to send verification code');
     } finally {
       setLoading(false);
     }
