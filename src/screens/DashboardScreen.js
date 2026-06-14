@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated, Linking, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -32,9 +32,61 @@ const DashboardScreen = ({ route, navigation }) => {
   const [medicines, setMedicines] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bpModalVisible, setBpModalVisible] = useState(false);
-  const { bloodPressureLogs, sleepLogs, setBloodPressureLogs, setSleepLogs } = useStore();
+  const { bloodPressureLogs, sleepLogs, setBloodPressureLogs, setSleepLogs, user } = useStore();
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const holdProgress = useRef(new Animated.Value(0)).current;
+
+  const triggerSOS = async () => {
+    try {
+      const circleData = await getCircleDetails(circleId);
+      
+      let locationString = "Location tracking unavailable";
+      if (circleData?.last_known_location?.latitude && circleData?.last_known_location?.longitude) {
+        locationString = `https://www.google.com/maps/search/?api=1&query=${circleData.last_known_location.latitude},${circleData.last_known_location.longitude}`;
+      }
+      
+      const rawText = `🚨 *CARECIRCLE EMERGENCY ALERT* 🚨\n\nImmediate attention required for our family Care Circle.\n- Triggered Remotely By: ${user?.full_name || 'CareCircle User'}\n- *Dad's Current Location:* ${locationString}\n\nPlease check on him immediately!`;
+      
+      const encodedText = encodeURIComponent(rawText);
+      const whatsAppUrl = `https://wa.me/?text=${encodedText}`;
+      
+      try {
+        await Linking.openURL(whatsAppUrl);
+      } catch (err) {
+        Alert.alert("Emergency Alert", rawText);
+      }
+    } catch (error) {
+      console.error('Error triggering SOS', error);
+      Alert.alert("Emergency Alert", "Failed to send emergency alert.");
+    }
+  };
+
+  const handleSosPressIn = () => {
+    Animated.timing(holdProgress, {
+      toValue: 1,
+      duration: 3000,
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (finished) {
+        triggerSOS();
+        Animated.timing(holdProgress, {
+           toValue: 0,
+           duration: 200,
+           useNativeDriver: false,
+        }).start();
+      }
+    });
+  };
+
+  const handleSosPressOut = () => {
+    holdProgress.stopAnimation();
+    Animated.timing(holdProgress, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
 
   useEffect(() => {
     Animated.loop(
@@ -109,6 +161,26 @@ const DashboardScreen = ({ route, navigation }) => {
     <View style={styles.safeArea}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         
+        {/* Module: Emergency SOS Banner */}
+        <View style={styles.sosSection}>
+          <Pressable 
+            onPressIn={handleSosPressIn}
+            onPressOut={handleSosPressOut}
+            style={styles.sosContainer}
+          >
+            <Animated.View style={[styles.sosProgressBar, {
+              width: holdProgress.interpolate({
+                inputRange: [0, 1],
+                outputRange: ['0%', '100%']
+              })
+            }]} />
+            <View style={styles.sosContent}>
+              <Text style={styles.sosTitle}>🚨 EMERGENCY SOS</Text>
+              <Text style={styles.sosSubtitle}>Hold for 3 seconds to alert Care Circle</Text>
+            </View>
+          </Pressable>
+        </View>
+
         {/* Module: Daily Progress Hero Card */}
         <View style={styles.progressSection}>
           <View style={styles.progressCard}>
@@ -265,6 +337,42 @@ const styles = StyleSheet.create({
   settingsIcon: { padding: 4 },
   sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 16, marginTop: 8 },
   
+  // Emergency SOS Banner Styles
+  sosSection: { marginBottom: 24 },
+  sosContainer: {
+    backgroundColor: '#FFEAEA',
+    borderRadius: THEME.borderRadius.card,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#FFCACA',
+    ...THEME.shadows.soft,
+    position: 'relative'
+  },
+  sosContent: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  sosTitle: {
+    ...THEME.typography.header,
+    color: THEME.colors.alert || '#E53935',
+    fontSize: 20,
+    marginBottom: 4
+  },
+  sosSubtitle: {
+    ...THEME.typography.label,
+    color: '#D32F2F',
+  },
+  sosProgressBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: '#FFCDD2',
+    zIndex: 1,
+  },
+
   // Progress Ring Styles
   progressSection: { marginBottom: 24 },
   progressCard: {

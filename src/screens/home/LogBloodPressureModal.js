@@ -46,27 +46,48 @@ const LogBloodPressureModal = ({ visible, onClose }) => {
         // Process image with ML Kit Text Recognition
         const recognizedText = await TextRecognition.recognize(uri);
         
-        // Very basic parsing: look for typical 3 digit patterns
-        // Usually blood pressure monitors show Systolic top, Diastolic middle, Pulse bottom.
-        // We'll extract all numbers and sort them or just take the first 3 lines if possible.
+        // Parse lines instead of just blocks to avoid merging multi-line numbers
+        // e.g. "131\n86\n82" becoming "1318682"
         const blocks = recognizedText.blocks;
         const numbers = [];
         
         blocks.forEach(block => {
-            const num = parseInt(block.text.replace(/[^0-9]/g, ''), 10);
-            if (!isNaN(num) && num > 30 && num < 300) {
-                numbers.push({ value: num, top: block.frame?.top || 0 });
-            }
+            const lines = block.lines && block.lines.length > 0 
+                ? block.lines 
+                : block.text.split('\n').map(t => ({ text: t, frame: block.frame }));
+                
+            lines.forEach(line => {
+                // Digital 7-segment displays often cause OCR to insert spaces, e.g. "1 3 1"
+                // So we strip all non-digits from the line before parsing
+                const cleanedText = line.text.replace(/[^0-9]/g, '');
+                if (cleanedText) {
+                    const num = parseInt(cleanedText, 10);
+                    if (num >= 30 && num <= 300) {
+                        numbers.push({ 
+                            value: num, 
+                            top: line.frame?.top || block.frame?.top || 0,
+                            height: line.frame?.height || block.frame?.height || 0
+                        });
+                    }
+                }
+            });
         });
 
-        // Sort vertically (top to bottom usually)
-        numbers.sort((a, b) => a.top - b.top);
+        // BP monitor numbers are typically the largest text on the screen.
+        // Sort by bounding box height descending to prioritize main readings.
+        numbers.sort((a, b) => b.height - a.height);
 
-        if (numbers.length >= 2) {
-            setSystolic(numbers[0].value.toString());
-            setDiastolic(numbers[1].value.toString());
-            if (numbers.length >= 3) {
-                setPulse(numbers[2].value.toString());
+        // Take up to top 3 largest numbers
+        const mainNumbers = numbers.slice(0, 3);
+
+        // Sort them vertically (top to bottom usually maps to Sys, Dia, Pulse)
+        mainNumbers.sort((a, b) => a.top - b.top);
+
+        if (mainNumbers.length >= 2) {
+            setSystolic(mainNumbers[0].value.toString());
+            setDiastolic(mainNumbers[1].value.toString());
+            if (mainNumbers.length >= 3) {
+                setPulse(mainNumbers[2].value.toString());
             }
             Alert.alert('Success', 'Extracted values from image. Please verify they are correct before saving.');
         } else {

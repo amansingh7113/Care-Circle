@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
-import { sendOtp, getGoogleAuthUrl, exchangeSession } from '../services/authApi';
+import { sendOtp, exchangeSession } from '../services/authApi';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
+import { supabase } from '../services/supabase';
 
 // Ensure the browser closes when returning to the app
 WebBrowser.maybeCompleteAuthSession();
@@ -81,23 +82,59 @@ const LoginScreen = ({ navigation }) => {
     setGoogleLoading(true);
     console.log('Initiating Google Login...');
     try {
-      // Use dynamic URL so it matches their current phone/emulator IP
-      const redirectUri = Linking.createURL('auth/callback'); 
-      const response = await getGoogleAuthUrl(redirectUri);
-      console.log('Google Auth Response:', response);
-      if (response && response.url) {
-        // Use Linking.openURL instead of WebBrowser to prevent the "instant close" bug on some Android devices
-        await Linking.openURL(response.url);
-        console.log('Opened browser via Linking');
+      // Use the HARDCODED scheme that we know is registered in the Supabase Dashboard
+      // changed from carecircle://auth/callback to carecircle://auth to match carecircle://*
+      const redirectUri = 'carecircle://auth';
+      console.log('Using static Redirect URI:', redirectUri);
+      
+      // Use local Supabase client so PKCE code challenge and state are properly generated!
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUri,
+          skipBrowserRedirect: true,
+          queryParams: { prompt: 'consent' }
+        }
+      });
+      
+      if (error) throw error;
+      
+      console.log('Google Auth Response URL:', data?.url);
+      if (data && data.url) {
+        // Use WebBrowser which natively catches custom schemes and bypasses Chrome's redirect block
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUri);
+        console.log('WebBrowser Result:', result);
         
-        // We do not await a result here because Linking.openURL just opens the browser.
-        // The deep link listener (useEffect) will catch the redirect when they finish logging in!
+        if (result.type === 'success' && result.url) {
+          // Extract access token manually from the Implicit Flow URL to prevent Supabase JS crashes
+          const url = result.url;
+          const paramsString = url.split('#')[1] || url.split('?')[1];
+          if (paramsString) {
+            const match = paramsString.match(/access_token=([^&]+)/);
+            if (match && match[1]) {
+              const accessToken = match[1];
+              try {
+                // Exchange session with our custom backend
+                const exchangeData = await exchangeSession(accessToken);
+                if (exchangeData.token) {
+                  await AsyncStorage.setItem('userToken', exchangeData.token);
+                  useStore.getState().setSession(exchangeData.token);
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  Alert.alert('Success', 'Successfully signed in!');
+                }
+              } catch (exchangeError) {
+                console.error('Exchange error:', exchangeError);
+                Alert.alert('Network Timeout', 'The backend is waking up. Please press Continue with Google again!');
+              }
+            }
+          }
+        }
       } else {
         Alert.alert('Error', 'Failed to get Google Auth URL');
       }
     } catch (error) {
       console.error('Google Auth Error:', error);
-      Alert.alert('Error', error.response?.data?.error || error.message || 'Failed to initialize Google Login');
+      Alert.alert('Error', error.message || 'Failed to initialize Google Login');
     } finally {
       setGoogleLoading(false);
     }

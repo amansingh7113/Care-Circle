@@ -5,7 +5,7 @@ import { API_BASE_URL } from './apiConfig';
 
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1/auth`,
-  timeout: 10000,
+  timeout: 60000, // Increased to 60s to survive Render cold starts
   headers: {
     'Content-Type': 'application/json',
     'Bypass-Tunnel-Reminder': 'true',
@@ -23,9 +23,10 @@ export const verifyOtp = async (phone, code) => {
 };
 
 export const getGoogleAuthUrl = async (redirectUri) => {
-  const url = redirectUri ? `/google?redirectUri=${encodeURIComponent(redirectUri)}` : '/google';
-  const response = await apiClient.get(url);
-  return response.data;
+  // Bypass backend to guarantee prompt=consent and skip Render sleep delays
+  const supabaseUrl = 'https://tslppywdlbayvgtuqpqb.supabase.co';
+  const url = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectUri)}&prompt=consent`;
+  return { url };
 };
 
 export const exchangeSession = async (accessToken) => {
