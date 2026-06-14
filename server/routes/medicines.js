@@ -60,7 +60,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'days must be an array of strings' });
   }
 
-  const instructions = JSON.stringify({ frequency, scheduled_times: scheduled_times || [], days: days || [] });
+  const instructions = { frequency, scheduled_times: scheduled_times || [], days: days || [] };
 
   const { data, error } = await supabase
     .from('medicines')
@@ -113,7 +113,7 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
   let usersMap = {};
   if (userIds.length > 0) {
     const { data: usersData } = await supabase.from('users').select('id, full_name').in('id', userIds);
-    usersData?.forEach(u => { usersMap[u.id] = u.full_name; });
+    usersData?.forEach(u => { usersMap[u.id] = u.full_name || 'Family Member'; });
   }
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -124,8 +124,12 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
   medicines.forEach(med => {
     let instructions = {};
     try {
-      instructions = typeof med.instructions === 'string' ? JSON.parse(med.instructions) : med.instructions;
-    } catch(e) {}
+      let parsed = typeof med.instructions === 'string' ? JSON.parse(med.instructions) : med.instructions;
+      if (typeof parsed === 'string') parsed = JSON.parse(parsed); // Handle double stringification
+      instructions = parsed || {};
+    } catch(e) {
+      console.log('Failed to parse instructions for med', med.id);
+    }
     
     const frequency = instructions.frequency || 'Daily';
     const scheduledTimes = instructions.scheduled_times || [];
@@ -273,6 +277,9 @@ router.delete('/:id', async (req, res) => {
   if (String(med.circle_id) !== String(userCircleId)) {
     return res.status(403).json({ error: 'Unauthorized access to this medicine' });
   }
+
+  // Manually delete logs to prevent foreign key constraint errors
+  await supabase.from('medicine_dose_logs').delete().eq('medicine_id', medicine_id);
 
   const { error } = await supabase
     .from('medicines')
