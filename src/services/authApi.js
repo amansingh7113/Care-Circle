@@ -33,3 +33,13 @@ export const exchangeSession = async (accessToken) => {
   const response = await apiClient.post('/exchange-session', { access_token: accessToken });
   return response.data;
 };
+
+export const registerEmail = async (email, password) => {
+  const response = await apiClient.post('/register-email', { email, password });
+  return response.data;
+};
+
+export const loginEmail = async (email, password) => {
+  const response = await apiClient.post('/login-email', { email, password });
+  return response.data;
+};

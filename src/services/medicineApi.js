@@ -47,8 +47,14 @@ export const logAdministration = async (medicineId, status) => {
   return response.data;
 };
 
+export const getMedicineAnalytics = async () => {
+  const response = await medicineApi.get(`/analytics/compliance`);
+  return response.data;
+};
+
 export default {
   getMedicines,
   addMedicine,
   logAdministration,
+  getMedicineAnalytics,
 };

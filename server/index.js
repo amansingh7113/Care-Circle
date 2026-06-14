@@ -51,8 +51,12 @@ app.get('/dashboard', async (req, res) => {
 
 const runMigrations = require('./db/migrate');
 
+const { startCron } = require('./cron/missedDoseCron');
+
 async function startServer() {
   await runMigrations();
+  
+  startCron();
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`CareCircle server listening on port ${port} (IPv4)`);

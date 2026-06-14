@@ -197,4 +197,128 @@ router.delete('/delete-account', async (req, res) => {
   }
 });
 
+// 6. Register with Email/Password
+router.post('/register-email', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+
+    // Register with Supabase Auth
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (authError) {
+      return res.status(400).json({ error: authError.message });
+    }
+
+    if (!authData.user) {
+      return res.status(400).json({ error: 'Failed to create user.' });
+    }
+
+    // Check if user is in users table, or provision basic profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      return res.status(500).json({ error: 'Error fetching user profile after sign up' });
+    }
+
+    let profile = userProfile;
+    if (!profile) {
+      // Provision user
+      profile = {
+        id: authData.user.id,
+        phone_number: null,
+        profile_role: 'User',
+        circle_id: null
+      };
+      
+      // Attempt to insert if DB triggers don't handle it
+      await supabase.from('users').insert(profile).select().single();
+    }
+
+    // Sign a local JWT
+    const jwtPayload = {
+      id: profile.id,
+      phone_number: profile.phone_number,
+      role: profile.profile_role,
+      circle_id: profile.circle_id
+    };
+
+    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(200).json({
+      token: localJwt,
+      user: profile,
+      session: authData.session
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 7. Login with Email/Password
+router.post('/login-email', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({ error: 'email and password are required' });
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (authError) {
+      return res.status(401).json({ error: authError.message });
+    }
+
+    // Fetch user profile from public.users table
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      return res.status(500).json({ error: 'Error fetching user profile' });
+    }
+
+    // Fallback if user profile not fully formed yet
+    const profile = userProfile || { 
+      id: authData.user.id, 
+      phone_number: null, 
+      profile_role: 'User', 
+      circle_id: null 
+    };
+
+    // Sign a local JWT
+    const jwtPayload = {
+      id: profile.id,
+      phone_number: profile.phone_number,
+      role: profile.profile_role,
+      circle_id: profile.circle_id
+    };
+
+    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(200).json({
+      token: localJwt,
+      user: profile,
+      session: authData.session
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

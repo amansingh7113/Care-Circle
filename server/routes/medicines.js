@@ -183,4 +183,66 @@ router.get('/:id/logs', async (req, res) => {
   res.status(200).json(data);
 });
 
+// 5. GET /api/v1/medicines/analytics/compliance
+// PERFORMANCE OPTIMIZATION: Ensure an index exists on medicine_dose_logs:
+// CREATE INDEX idx_medicine_dose_logs_circle_taken ON medicine_dose_logs(circle_id, taken_at);
+router.get('/analytics/compliance', async (req, res) => {
+  const circleId = req.user.circle_id;
+
+  if (!circleId) {
+    return res.status(403).json({ error: 'User does not belong to a circle' });
+  }
+
+  const now = new Date();
+  
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(now.getDate() - 7);
+  sevenDaysAgo.setHours(0, 0, 0, 0);
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(now.getDate() - 30);
+  thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+  // Fetch logs for the past 30 days (covers both 7d and 30d calculation)
+  const { data: logs, error: logsError } = await supabase
+    .from('medicine_dose_logs')
+    .select('status, taken_at')
+    .eq('circle_id', circleId)
+    .gte('taken_at', thirtyDaysAgo.toISOString());
+
+  if (logsError) return res.status(400).json({ error: logsError.message });
+
+  const logs30d = logs;
+  const logs7d = logs.filter(l => new Date(l.taken_at) >= sevenDaysAgo);
+
+  const totalTracked30d = logs30d.length;
+  const totalTaken30d = logs30d.filter(l => l.status === 'taken').length;
+  
+  const totalTracked7d = logs7d.length;
+  const totalTaken7d = logs7d.filter(l => l.status === 'taken').length;
+  const totalMissed7d = logs7d.filter(l => l.status === 'missed').length;
+
+  let adherence_rate_30d = 0;
+  if (totalTracked30d > 0) {
+    adherence_rate_30d = Math.round((totalTaken30d / totalTracked30d) * 100);
+  }
+
+  let adherence_rate_7d = 0;
+  if (totalTracked7d > 0) {
+    adherence_rate_7d = Math.round((totalTaken7d / totalTracked7d) * 100);
+  }
+
+  let statusLabel = 'Attention Needed';
+  if (adherence_rate_7d >= 90) statusLabel = 'Excellent';
+  else if (adherence_rate_7d >= 75) statusLabel = 'Stable';
+
+  res.status(200).json({
+    adherence_rate_7d,
+    adherence_rate_30d,
+    total_taken: totalTaken7d,
+    total_missed: totalMissed7d,
+    status: statusLabel
+  });
+});
+
 module.exports = router;
