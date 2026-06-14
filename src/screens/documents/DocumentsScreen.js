@@ -86,11 +86,13 @@ const DocumentsScreen = ({ navigation }) => {
       const filePath = `${circleId}/${fileName}`;
 
       const response = await fetch(file.uri);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
 
       const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(filePath, blob);
+        .upload(filePath, arrayBuffer, {
+          contentType: file.mimeType || 'application/octet-stream'
+        });
 
       if (uploadError) throw uploadError;
 
