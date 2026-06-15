@@ -33,12 +33,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
       setTasks(data.tasks || data || []);
     } catch (error) {
       console.log('Failed to fetch tasks', error);
-      // Fallback mock data for UI testing if API fails
-      setTasks([
-        { id: '1', title: 'Pick up Groceries', category: 'Groceries', dueDate: 'Tomorrow, 5 PM', assignee: 'Unassigned', status: 'pending' },
-        { id: '2', title: 'Doctor Appointment', category: 'Medical', dueDate: 'Today, 2 PM', assignee: 'Alice', status: 'pending' },
-        { id: '3', title: 'Buy Medicines', category: 'Medical', dueDate: 'Yesterday', assignee: 'You', status: 'completed' },
-      ].filter(t => t.status === activeTab));
+      setTasks([]);
     } finally {
       setIsLoading(false);
     }

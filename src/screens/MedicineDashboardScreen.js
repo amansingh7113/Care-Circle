@@ -136,11 +136,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       setMedicines(data.medicines || data || []);
     } catch (error) {
       console.log('Failed to fetch medicines', error);
-      // Fallback mock data for UI testing if API fails
-      setMedicines([
-        { id: '1', name: 'Aspirin 81mg', dosage: '81mg', time: '8:00 AM', shape: 'mepirril', status: 'pending' },
-        { id: '2', name: 'Lisinopril 10mg', dosage: '10mg', time: '8:00 AM', shape: 'round', status: 'taken' },
-      ]);
+      setMedicines([]);
     } finally {
       setIsLoading(false);
     }

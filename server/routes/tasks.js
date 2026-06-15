@@ -40,7 +40,7 @@ router.post('/', async (req, res) => {
   const userCircleId = req.user.circle_id;
   const targetCircleId = circle_id || userCircleId;
 
-  if (targetCircleId !== userCircleId) {
+  if (String(targetCircleId) !== String(userCircleId)) {
     return res.status(403).json({ error: 'Unauthorized to add tasks to this circle' });
   }
 
@@ -79,7 +79,7 @@ router.get('/circles/:circleId/tasks', async (req, res) => {
   const { status } = req.query; // e.g., ?status=pending
   const userCircleId = req.user.circle_id;
 
-  if (circleId !== userCircleId) {
+  if (String(circleId) !== String(userCircleId)) {
     return res.status(403).json({ error: 'Unauthorized access to this circle' });
   }
 
@@ -119,7 +119,7 @@ router.patch('/:id', async (req, res) => {
     return res.status(404).json({ error: 'Task not found' });
   }
 
-  if (task.circle_id !== userCircleId) {
+  if (String(task.circle_id) !== String(userCircleId)) {
     return res.status(403).json({ error: 'Unauthorized access to this task' });
   }
 
@@ -173,7 +173,7 @@ router.post('/:id/comments', async (req, res) => {
     return res.status(404).json({ error: 'Task not found' });
   }
 
-  if (task.circle_id !== userCircleId) {
+  if (String(task.circle_id) !== String(userCircleId)) {
     return res.status(403).json({ error: 'Unauthorized access to this task' });
   }
 

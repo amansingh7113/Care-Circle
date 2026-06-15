@@ -3,11 +3,13 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginEmail, registerEmail } from '../services/authApi';
 import { getMedicineAnalytics } from '../services/medicineApi';
+import { jwtDecode } from 'jwt-decode';
 
 export const useStore = create(
   persist(
     (set) => ({
       userSession: null,
+      user: null,
       currentCircle: null,
       medicinesList: [],
       dailyTasks: [],
@@ -19,8 +21,14 @@ export const useStore = create(
       medicineAnalytics: null,
       analyticsLoading: false,
 
-      setSession: (session) => set({ userSession: session }),
-      clearSession: () => set({ userSession: null, currentCircle: null, medicinesList: [], dailyTasks: [], bloodPressureLogs: [], sleepLogs: [], medicineAnalytics: null, analyticsLoading: false }),
+      setSession: (session) => {
+        let decodedUser = null;
+        if (session) {
+          try { decodedUser = jwtDecode(session); } catch (e) {}
+        }
+        set({ userSession: session, user: decodedUser });
+      },
+      clearSession: () => set({ userSession: null, user: null, currentCircle: null, medicinesList: [], dailyTasks: [], bloodPressureLogs: [], sleepLogs: [], medicineAnalytics: null, analyticsLoading: false }),
       setCircle: (circle) => set({ currentCircle: circle }),
       setMedicines: (medicines) => set({ medicinesList: medicines }),
       setBloodPressureLogs: (logs) => set({ bloodPressureLogs: logs }),
@@ -38,7 +46,9 @@ export const useStore = create(
           const data = await loginEmail(email, password);
           if (data.token) {
             await AsyncStorage.setItem('userToken', data.token);
-            set({ userSession: data.token, emailAuthLoading: false });
+            let decodedUser = null;
+            try { decodedUser = jwtDecode(data.token); } catch(e){}
+            set({ userSession: data.token, user: decodedUser, emailAuthLoading: false });
             return data;
           }
         } catch (error) {
@@ -55,7 +65,9 @@ export const useStore = create(
           const data = await registerEmail(email, password);
           if (data.token) {
             await AsyncStorage.setItem('userToken', data.token);
-            set({ userSession: data.token, emailAuthLoading: false });
+            let decodedUser = null;
+            try { decodedUser = jwtDecode(data.token); } catch(e){}
+            set({ userSession: data.token, user: decodedUser, emailAuthLoading: false });
             return data;
           }
         } catch (error) {

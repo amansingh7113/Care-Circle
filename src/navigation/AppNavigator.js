@@ -8,6 +8,8 @@ import AddMedicineScreen from '../screens/AddMedicineScreen';
 import TaskBoardScreen from '../screens/TaskBoardScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import DoctorVisitsScreen from '../screens/doctor/DoctorVisitsScreen';
+import ExpensesScreen from '../screens/expenses/ExpensesScreen';
 
 import DocumentsScreen from '../screens/documents/DocumentsScreen';
 
@@ -30,6 +32,8 @@ const AppNavigator = () => {
       <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="Documents" component={DocumentsScreen} />
+      <Stack.Screen name="DoctorVisits" component={DoctorVisitsScreen} />
+      <Stack.Screen name="Expenses" component={ExpensesScreen} />
     </Stack.Navigator>
   );
 };
