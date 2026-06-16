@@ -61,6 +61,20 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Deduplication check
+    const { data: existingLogs, error: checkError } = await supabase
+      .from('sleep_logs')
+      .select('*')
+      .eq('patient_id', patient_id)
+      .lt('sleep_start', sleep_end)
+      .gt('sleep_end', sleep_start);
+
+    if (checkError) {
+      console.error('Error checking for sleep overlap:', checkError);
+    } else if (existingLogs && existingLogs.length > 0) {
+      return res.status(200).json({ data: existingLogs[0], deduplicated: true, message: 'Overlapping sleep log exists' });
+    }
+
     const { data, error } = await supabase
       .from('sleep_logs')
       .insert([{

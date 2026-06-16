@@ -90,11 +90,16 @@ router.post('/', async (req, res) => {
 
 // Generate a signed upload URL
 router.post('/upload-url', async (req, res) => {
-  const { fileName } = req.body;
+  const { fileName, contentType } = req.body;
   const userCircleId = req.user.circle_id;
 
-  if (!fileName || !userCircleId) {
-    return res.status(400).json({ error: 'Missing fileName or circle_id' });
+  if (!fileName || !userCircleId || !contentType) {
+    return res.status(400).json({ error: 'Missing fileName, contentType, or circle_id' });
+  }
+
+  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+  if (!allowedTypes.includes(contentType)) {
+    return res.status(400).json({ error: 'Unsupported file type. Allowed: JPG, PNG, PDF.' });
   }
 
   const filePath = `${userCircleId}/${fileName}`;
@@ -107,7 +112,7 @@ router.post('/upload-url', async (req, res) => {
 
     if (error) throw error;
 
-    res.status(200).json({ signedUrl: data.signedUrl, token: data.token, filePath });
+    res.status(200).json({ signedUrl: data.signedUrl, token: data.token, filePath, maxFileSize: '10MB' });
   } catch (error) {
     console.error('Error generating upload URL:', error);
     res.status(500).json({ error: error.message });

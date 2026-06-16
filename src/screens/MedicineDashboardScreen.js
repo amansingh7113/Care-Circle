@@ -12,6 +12,7 @@ import { THEME } from '../styles/theme';
 import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
+import VoiceLogButton from '../components/VoiceLogButton';
 
 const MedicineDashboardScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -563,6 +564,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
+      <VoiceLogButton circleId={circleId} onSuccess={fetchMedicines} />
     </View>
   );
 };

@@ -79,6 +79,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
   const renderTask = ({ item }) => (
     <TouchableOpacity 
       style={styles.card}
+      onPress={() => navigation.navigate('TaskDetail', { task: item })}
       onLongPress={() => handleDeleteTask(item.id)}
       activeOpacity={0.8}
     >

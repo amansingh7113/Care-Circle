@@ -4,7 +4,8 @@ const validateEnv = () => {
     'SUPABASE_ANON_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
     'JWT_SECRET',
-    'PORT'
+    'PORT',
+    'GEMINI_API_KEY'
   ];
 
   const missingKeys = [];

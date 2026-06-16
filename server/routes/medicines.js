@@ -412,20 +412,20 @@ router.post('/voice-log', async (req, res) => {
 
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    const prompt = \`
+    const prompt = `
     You are an assistant that parses voice logs for taking medicine.
-    User transcript: "\${transcript}"
-    Available medicines: \${JSON.stringify(medicines)}
+    User transcript: "${transcript}"
+    Available medicines: ${JSON.stringify(medicines)}
     Identify which medicine(s) the user took. Return a JSON array of medicine IDs. Only return valid IDs from the list.
     If none match, return an empty array.
-    Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.\`;
+    Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.`;
     
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
     });
     
-    const parsedText = response.text().trim().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '');
+    const parsedText = response.text.trim().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '');
     let medicineIds = [];
     try {
       medicineIds = JSON.parse(parsedText);
@@ -463,8 +463,8 @@ router.post('/voice-log', async (req, res) => {
               type: 'REFILL_ALERT',
               priority: 'high',
               context: { medicine_name: med.data.name, remaining: currentStock },
-              title: \`Refill Alert: \${med.data.name}\`,
-              body: \`Only \${currentStock} doses remaining for \${med.data.name}.\`
+              title: `Refill Alert: ${med.data.name}`,
+              body: `Only ${currentStock} doses remaining for ${med.data.name}.`
             }]);
           }
         }

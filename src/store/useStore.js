@@ -20,6 +20,9 @@ export const useStore = create(
       emailAuthError: null,
       medicineAnalytics: null,
       analyticsLoading: false,
+      notifications: [],
+      unreadNotificationCount: 0,
+      pendingSyncQueue: [],
 
       setSession: (session) => {
         let decodedUser = null;
@@ -28,7 +31,7 @@ export const useStore = create(
         }
         set({ userSession: session, user: decodedUser });
       },
-      clearSession: () => set({ userSession: null, user: null, currentCircle: null, medicinesList: [], dailyTasks: [], bloodPressureLogs: [], sleepLogs: [], medicineAnalytics: null, analyticsLoading: false }),
+      clearSession: () => set({ userSession: null, user: null, currentCircle: null, medicinesList: [], dailyTasks: [], bloodPressureLogs: [], sleepLogs: [], medicineAnalytics: null, analyticsLoading: false, notifications: [], unreadNotificationCount: 0, pendingSyncQueue: [] }),
       setCircle: (circle) => set({ currentCircle: circle }),
       setMedicines: (medicines) => set({ medicinesList: medicines }),
       setBloodPressureLogs: (logs) => set({ bloodPressureLogs: logs }),
@@ -40,6 +43,13 @@ export const useStore = create(
           task.id === taskId ? { ...task, status } : task
         )
       })),
+      setNotifications: (notifications) => set({ notifications }),
+      setUnreadCount: (count) => set({ unreadNotificationCount: count }),
+      addToPendingSync: (mutation) => set((state) => ({ pendingSyncQueue: [...state.pendingSyncQueue, { ...mutation, id: Date.now().toString(), timestamp: new Date().toISOString() }] })),
+      removePendingSync: (id) => set((state) => ({ pendingSyncQueue: state.pendingSyncQueue.filter(m => m.id !== id) })),
+      flushPendingSync: async () => {
+        // Implementation logic handled externally or skipped for MVP
+      },
       loginWithEmail: async (email, password) => {
         set({ emailAuthLoading: true, emailAuthError: null });
         try {
@@ -92,6 +102,15 @@ export const useStore = create(
     {
       name: 'care-circle-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        userSession: state.userSession,
+        user: state.user,
+        currentCircle: state.currentCircle,
+        pendingSyncQueue: state.pendingSyncQueue,
+        bloodPressureLogs: state.bloodPressureLogs,
+        sleepLogs: state.sleepLogs,
+        stepLogs: state.stepLogs
+      }),
     }
   )
 );

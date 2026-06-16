@@ -9,7 +9,8 @@ import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
-import { FileText, Trash2, Download, Tag } from 'lucide-react-native';
+import { FileText, Trash2, Download, Tag, Sparkles } from 'lucide-react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const CATEGORIES = ['Prescription', 'Reports', 'Medicines', 'Bills'];
 
@@ -63,12 +64,27 @@ const DocumentsScreen = ({ navigation }) => {
       const file = result.assets[0];
       if (!file) return;
 
+      let fileToUpload = file;
+      if (file.mimeType && file.mimeType.startsWith('image/')) {
+        const manipResult = await ImageManipulator.manipulateAsync(
+          file.uri,
+          [{ resize: { width: 1080 } }],
+          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+        );
+        fileToUpload = {
+          ...file,
+          uri: manipResult.uri,
+          name: file.name.replace(/\.[^/.]+$/, ".jpg"),
+          mimeType: 'image/jpeg'
+        };
+      }
+
       if (doctorVisits.length > 0) {
-        setPendingFile(file);
+        setPendingFile(fileToUpload);
         setSelectedVisitId(null);
         setShowVisitModal(true);
       } else {
-        await executeUpload(file, null);
+        await executeUpload(fileToUpload, null);
       }
     } catch (error) {
       console.error('File pick error:', error);
@@ -177,6 +193,14 @@ const DocumentsScreen = ({ navigation }) => {
         </View>
       </View>
       <View style={styles.docActions}>
+        {item.category === 'Prescription' && (
+          <TouchableOpacity 
+            style={styles.actionBtn}
+            onPress={() => navigation.navigate('AttachmentViewer', { url: item.file_url, isPrescription: true })}
+          >
+            <Sparkles size={20} color={THEME.colors.primary} />
+          </TouchableOpacity>
+        )}
         <TouchableOpacity 
           style={styles.actionBtn}
           onPress={() => Linking.openURL(item.file_url)}

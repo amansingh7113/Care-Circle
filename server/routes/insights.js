@@ -39,6 +39,13 @@ const authenticate = async (req, res, next) => {
 router.use(authenticate);
 
 router.post('/generate-manual', async (req, res) => {
+  // ARCHITECTURE NOTE: Currently uses cloud Gemini API for prescription analysis.
+  // Future migration path: Route through a secure, locally hosted LLM pipeline
+  // (e.g., Llama 3.2 via Ollama server) to ensure patient medical records
+  // never leave the enterprise environment. This would involve:
+  // 1. Replace Gemini SDK calls with HTTP requests to local Ollama endpoint
+  // 2. Use a vision-capable model (e.g., llava) for prescription image analysis
+  // 3. Keep the same structured output schema for frontend compatibility
   const { prescription_id, force_refresh } = req.body;
   const circleId = req.user.circle_id;
 
@@ -133,8 +140,9 @@ router.post('/generate-manual', async (req, res) => {
     
     Correlate the instructions from the prescription with the patient's recent activity (steps), sleep quality, and medicine adherence. Provide actionable insights.`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.1-pro',
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timed out')), 15000));
+    const generatePromise = ai.models.generateContent({
+      model: 'gemini-1.5-pro',
       contents: [
         {
           role: 'user',
@@ -180,8 +188,28 @@ router.post('/generate-manual', async (req, res) => {
       }
     });
 
+    const response = await Promise.race([generatePromise, timeoutPromise]);
+
     const outputJsonString = response.text;
-    const outputJson = JSON.parse(outputJsonString);
+    let outputJson;
+    try {
+      outputJson = JSON.parse(outputJsonString);
+      // Schema validation
+      const requiredKeys = ['telemetry_correlations', 'whats_right', 'needs_attention', 'actionable_recommendations'];
+      for (const key of requiredKeys) {
+        if (!outputJson[key]) {
+          outputJson[key] = [];
+        }
+      }
+    } catch (parseErr) {
+      console.warn('Failed to parse AI response, using fallback schema', parseErr);
+      outputJson = {
+        telemetry_correlations: [],
+        whats_right: [],
+        needs_attention: [],
+        actionable_recommendations: ['AI analysis was temporarily unavailable. Please consult your healthcare provider.']
+      };
+    }
 
     // 5. Save to History
     await supabase.from('ai_insights_history').insert([{

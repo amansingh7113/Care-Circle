@@ -24,7 +24,23 @@
         "com.google.android.gms.permission.ACTIVITY_RECOGNITION",
         "com.google.android.gms.permission.ACTIVITY_RECOGNITION"
       ],
-      "package": "com.anonymous.carecircle"
+      "package": "com.anonymous.carecircle",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "carecircle",
+              "host": "care-circle-backend-hfc0.onrender.com"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {},
     "plugins": [

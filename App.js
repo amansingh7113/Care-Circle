@@ -7,6 +7,10 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { useStore } from './src/store/useStore';
 import StepTrackerService from './src/components/StepTrackerService';
 import SleepTrackerService from './src/components/SleepTrackerService';
+import { navigationRef } from './src/services/navigationRef';
+import * as Linking from 'expo-linking';
+import NetworkListener from './src/components/NetworkListener';
+import { registerForPushNotifications, setupNotificationListeners } from './src/services/pushNotifications';
 
 export default function App() {
   const userSession = useStore((state) => state.userSession);
@@ -22,11 +26,27 @@ export default function App() {
       setHasHydrated(true);
     }
 
+    // Push Notifications
+    registerForPushNotifications();
+    const cleanupNotifications = setupNotificationListeners(navigationRef);
+
     return () => {
       unsubHydrate?.();
       unsubFinishHydration?.();
+      cleanupNotifications?.();
     };
   }, []);
+
+  const linking = {
+    prefixes: [Linking.createURL('/'), 'carecircle://'],
+    config: {
+      screens: {
+        CircleSelection: 'join',
+        Dashboard: 'dashboard',
+        MedicineTracker: 'medicines',
+      },
+    },
+  };
 
   if (!hasHydrated) {
     return (
@@ -37,16 +57,19 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      {userSession == null ? (
-        <AuthNavigator />
-      ) : (
-        <>
-          <StepTrackerService />
-          <SleepTrackerService />
-          <AppNavigator />
-        </>
-      )}
-    </NavigationContainer>
+    <>
+      <NetworkListener />
+      <NavigationContainer ref={navigationRef} linking={linking}>
+        {userSession == null ? (
+          <AuthNavigator />
+        ) : (
+          <>
+            <StepTrackerService />
+            <SleepTrackerService />
+            <AppNavigator />
+          </>
+        )}
+      </NavigationContainer>
+    </>
   );
 }

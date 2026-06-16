@@ -58,10 +58,22 @@ export const deleteTask = async (taskId) => {
   return response.data;
 };
 
+export const getTaskComments = async (taskId) => {
+  const response = await taskApi.get(`/${taskId}/comments`);
+  return response.data;
+};
+
+export const addTaskComment = async (taskId, content) => {
+  const response = await taskApi.post(`/${taskId}/comments`, { comment: content });
+  return response.data;
+};
+
 export default {
   getTasks,
   createTask,
   updateTaskStatus,
   updateTask,
   deleteTask,
+  getTaskComments,
+  addTaskComment,
 };

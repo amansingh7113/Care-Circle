@@ -15,7 +15,7 @@ app.use(express.json());
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
 // Create a single supabase client for interacting with your database
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -31,6 +31,7 @@ const sleepRouter = require('./routes/sleep');
 const stepsRouter = require('./routes/steps');
 const documentsRouter = require('./routes/documents');
 const insightsRouter = require('./routes/insights');
+const notificationsRouter = require('./routes/notifications');
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/circles', circlesRouter);
 app.use('/api/v1/medicines', medicinesRouter);
@@ -42,6 +43,7 @@ app.use('/api/v1/sleep', sleepRouter);
 app.use('/api/v1/steps', stepsRouter);
 app.use('/api/v1/documents', documentsRouter);
 app.use('/api/v1/insights', insightsRouter);
+app.use('/api/v1/notifications', notificationsRouter);
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing or invalid authorization header' });
@@ -65,7 +67,7 @@ app.get('/dashboard', authenticate, async (req, res) => {
     const [vitals, sleep, steps, medicines, tasks] = await Promise.all([
       supabase.from('blood_pressure_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('sleep_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
-      supabase.from('steps_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
+      supabase.from('step_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('medicines').select('*').eq('circle_id', circle_id).eq('is_archived', false),
       supabase.from('tasks').select('*').eq('circle_id', circle_id).eq('status', 'pending')
     ]);

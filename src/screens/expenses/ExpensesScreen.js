@@ -14,7 +14,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { getExpensesSummary, addExpense, deleteExpense, updateExpense } from '../../services/expenseApi';
+import { getExpensesSummary, addExpense, deleteExpense, updateExpense, updateBudget } from '../../services/expenseApi';
 import useStore from '../../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -26,6 +26,8 @@ const ExpensesScreen = () => {
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Medical');
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+  const [newBudgetAmount, setNewBudgetAmount] = useState('');
   const circleId = useStore(state => state.currentCircleId);
 
   useEffect(() => {
@@ -104,6 +106,25 @@ const ExpensesScreen = () => {
     );
   };
 
+  const openBudgetModal = () => {
+    setNewBudgetAmount(summary.monthly_limit?.toString() || '');
+    setBudgetModalVisible(true);
+  };
+
+  const handleSaveBudget = async () => {
+    if (!newBudgetAmount) return;
+    try {
+      setLoading(true);
+      await updateBudget(Number(newBudgetAmount));
+      setBudgetModalVisible(false);
+      fetchExpensesSummary();
+    } catch (error) {
+      console.error('Failed to update budget', error);
+      setLoading(false);
+      Alert.alert('Error', 'Failed to update budget');
+    }
+  };
+
   const consumptionPercentage = summary.monthly_limit > 0 
     ? Math.min((summary.total_spent / summary.monthly_limit) * 100, 100) 
     : 0;
@@ -139,6 +160,14 @@ const ExpensesScreen = () => {
         <ActivityIndicator size="large" color="#1A73E8" style={styles.loader} />
       ) : (
         <>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Expenses</Text>
+            <TouchableOpacity onPress={openBudgetModal} style={styles.editBudgetBtn}>
+              <Ionicons name="pencil" size={16} color="#1A73E8" />
+              <Text style={styles.editBudgetBtnText}>Edit Budget</Text>
+            </TouchableOpacity>
+          </View>
+
           <View style={styles.progressContainer}>
             <Text style={styles.progressText}>
               Spent: ₹{summary.total_spent} / ₹{summary.monthly_limit}
@@ -228,6 +257,42 @@ const ExpensesScreen = () => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Budget Modal */}
+      <Modal
+        visible={budgetModalVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setBudgetModalVisible(false)}
+      >
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Edit Monthly Budget</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter monthly limit (e.g. 5000)"
+              keyboardType="numeric"
+              value={newBudgetAmount}
+              onChangeText={setNewBudgetAmount}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={[styles.button, styles.cancelButton]} 
+                onPress={() => setBudgetModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSaveBudget}>
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -236,6 +301,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  editBudgetBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F0FE',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  editBudgetBtnText: {
+    color: '#1A73E8',
+    marginLeft: 6,
+    fontWeight: '600',
+    fontSize: 14,
   },
   loader: {
     flex: 1,

@@ -112,7 +112,7 @@ async function checkMissedDoses() {
             scheduled_time: dose.timeStr,
             logged_by: null // System generated
           });
-          console.log(`[Cron] Flagging missed dose for Medicine: \${med.name} (Circle: \${med.circle_id}) at \${dose.timeStr} on \${dose.dateObj.toDateString()}`);
+          console.log(`[Cron] Flagging missed dose for Medicine: ${med.name} (Circle: ${med.circle_id}) at ${dose.timeStr} on ${dose.dateObj.toDateString()}`);
           
           // Insert urgent notification for caregivers
           getSupabase().from('notifications').insert([{
@@ -121,9 +121,42 @@ async function checkMissedDoses() {
             priority: 'urgent',
             context: { medicine_name: med.name, scheduled_time: dose.timeStr },
             title: 'Missed Dose Alert',
-            body: \`\${med.name} was missed at \${dose.timeStr}.\`
-          }]).then(({error}) => {
-             if (error) console.error('[Cron] Error inserting missed dose notification:', error);
+            body: `${med.name} was missed at ${dose.timeStr}.`
+          }]).then(async ({error}) => {
+             if (error) {
+               console.error('[Cron] Error inserting missed dose notification:', error);
+             } else {
+               // After notification insert, send push notifications
+               const { data: circleUsers } = await getSupabase()
+                 .from('users')
+                 .select('push_token')
+                 .eq('circle_id', med.circle_id)
+                 .not('push_token', 'is', null);
+
+               if (circleUsers && circleUsers.length > 0) {
+                 const messages = circleUsers
+                   .filter(u => u.push_token)
+                   .map(u => ({
+                     to: u.push_token,
+                     sound: 'default',
+                     title: 'Missed Dose Alert',
+                     body: `${med.name} dose was missed`,
+                     data: { type: 'MISSED_DOSE_ALERT', medicine_id: med.id }
+                   }));
+                 
+                 if (messages.length > 0) {
+                   try {
+                     await fetch('https://exp.host/--/api/v2/push/send', {
+                       method: 'POST',
+                       headers: { 'Content-Type': 'application/json' },
+                       body: JSON.stringify(messages)
+                     });
+                   } catch (pushErr) {
+                     console.error('[Cron] Push notification error:', pushErr);
+                   }
+                 }
+               }
+             }
           });
         }
       }

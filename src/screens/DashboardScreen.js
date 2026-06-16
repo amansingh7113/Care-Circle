@@ -298,8 +298,9 @@ const DashboardScreen = ({ route, navigation }) => {
                     if (isSleep) {
                       navigation.navigate('SleepDetails');
                     }
+                    if (isSteps) navigation.navigate('StepHistory');
                   }}
-                  activeOpacity={(isBP || isSleep || isMedication) ? 0.7 : 1}
+                  activeOpacity={(isBP || isSleep || isMedication || isSteps) ? 0.7 : 1}
                 >
                   <View style={styles.vitalHeaderRow}>
                     {isMedication ? (
@@ -400,10 +401,18 @@ const DashboardScreen = ({ route, navigation }) => {
         <SafeAreaView>
           <View style={styles.headerContainer}>
             <Text style={styles.header}>{circleName}</Text>
-            <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
-               {/* Gear icon placeholder */}
-               <Text style={{fontSize: 24, color: THEME.colors.primary}}>⚙️</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Notifications')}>
+                 <Text style={{fontSize: 24, color: THEME.colors.primary}}>🔔</Text>
+                 <View style={styles.notificationBadge}>
+                   <Text style={styles.notificationBadgeText}>3</Text>
+                 </View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
+                 {/* Gear icon placeholder */}
+                 <Text style={{fontSize: 24, color: THEME.colors.primary}}>⚙️</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </SafeAreaView>
       </BlurView>
@@ -418,7 +427,9 @@ const styles = StyleSheet.create({
   blurHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingHorizontal: 20 },
   headerContainer: { marginTop: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   header: { ...THEME.typography.header, color: THEME.colors.primary },
-  settingsIcon: { padding: 4 },
+  settingsIcon: { padding: 4, position: 'relative', marginLeft: 8 },
+  notificationBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: THEME.colors.alert || '#E53935', borderRadius: 10, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  notificationBadgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
   sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 16, marginTop: 8 },
   
   // Emergency SOS Banner Styles

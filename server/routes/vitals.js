@@ -6,7 +6,7 @@ const jwt = require('jsonwebtoken');
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Authentication Middleware
@@ -89,6 +89,20 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { systolic, diastolic, pulse } = req.body;
 
+    const { data: existingLog, error: fetchError } = await supabase
+      .from('blood_pressure_logs')
+      .select('circle_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingLog) {
+      return res.status(404).json({ error: 'Vital log not found' });
+    }
+
+    if (existingLog.circle_id !== req.user.circle_id) {
+      return res.status(403).json({ error: 'Forbidden: You do not have access to update this vital log' });
+    }
+
     const { data, error } = await supabase
       .from('blood_pressure_logs')
       .update({ systolic, diastolic, pulse })
@@ -109,6 +123,20 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    const { data: existingLog, error: fetchError } = await supabase
+      .from('blood_pressure_logs')
+      .select('circle_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existingLog) {
+      return res.status(404).json({ error: 'Vital log not found' });
+    }
+
+    if (existingLog.circle_id !== req.user.circle_id) {
+      return res.status(403).json({ error: 'Forbidden: You do not have access to delete this vital log' });
+    }
+
     const { error } = await supabase
       .from('blood_pressure_logs')
       .delete()

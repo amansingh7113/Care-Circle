@@ -1,11 +1,29 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator, SafeAreaView, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Sparkles } from 'lucide-react-native';
 import { THEME } from '../../styles/theme';
+import AIInsightsModal from '../../components/AIInsightsModal';
 
 const AttachmentViewerScreen = ({ route, navigation }) => {
-  const { url } = route.params;
+  const { url, isPrescription } = route.params;
   const [loading, setLoading] = useState(true);
+  const [showAIModal, setShowAIModal] = useState(false);
+  const [isAILoading, setIsAILoading] = useState(false);
+  
+  const dummyInsights = {
+    whats_right: ['Dosage is appropriate for your age.'],
+    needs_attention: ['Potential interaction with currently taken Aspirin.'],
+    telemetry_correlations: ['Your BP trend is stable.'],
+    actionable_recommendations: ['Take after meals.']
+  };
+
+  const handleOpenAIInsights = () => {
+    setShowAIModal(true);
+    setIsAILoading(true);
+    setTimeout(() => {
+      setIsAILoading(false);
+    }, 1500);
+  };
 
   // If there's no extension or it's unknown from supabase, we could try to guess, but we'll check for typical image extensions.
   // Supabase public URLs might not have extensions at the end if they are just paths. 
@@ -28,7 +46,13 @@ const AttachmentViewerScreen = ({ route, navigation }) => {
           <Ionicons name="close" size={28} color={THEME.colors.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Attachment Viewer</Text>
-        <View style={{ width: 28 }} />
+        {isPrescription ? (
+          <TouchableOpacity style={styles.aiButton} onPress={handleOpenAIInsights}>
+            <Sparkles size={20} color={THEME.colors.primary} />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 28 }} />
+        )}
       </View>
 
       <View style={styles.content}>
@@ -49,6 +73,13 @@ const AttachmentViewerScreen = ({ route, navigation }) => {
           </View>
         )}
       </View>
+
+      <AIInsightsModal
+        visible={showAIModal}
+        onClose={() => setShowAIModal(false)}
+        insights={dummyInsights}
+        isLoading={isAILoading}
+      />
     </SafeAreaView>
   );
 };
@@ -104,6 +135,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  aiButton: {
+    padding: 8,
+    backgroundColor: THEME.colors.white,
+    borderRadius: 20,
+  }
 });
 
 export default AttachmentViewerScreen;

@@ -5,6 +5,7 @@ import { getMedicines, logAdministration } from '../../services/medicineApi';
 import { THEME } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../components/EmptyState';
+import VoiceLogButton from '../../components/VoiceLogButton';
 
 const PatientDashboardScreen = ({ navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -116,6 +117,7 @@ const PatientDashboardScreen = ({ navigation }) => {
           />
         )}
       </View>
+      <VoiceLogButton circleId={currentCircle?.id} onSuccess={fetchPendingMedicines} />
     </SafeAreaView>
   );
 };

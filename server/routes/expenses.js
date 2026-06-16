@@ -142,4 +142,23 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+router.put('/budget', async (req, res) => {
+  try {
+    const { monthly_limit } = req.body;
+    if (!monthly_limit || monthly_limit <= 0) {
+      return res.status(400).json({ error: 'Valid monthly_limit is required' });
+    }
+    const { data, error } = await supabase
+      .from('circle_budgets')
+      .upsert({ circle_id: req.user.circle_id, monthly_limit, updated_at: new Date().toISOString() }, { onConflict: 'circle_id' })
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ data });
+  } catch (err) {
+    console.error('Update budget error:', err);
+    res.status(500).json({ error: 'Failed to update budget' });
+  }
+});
+
 module.exports = router;

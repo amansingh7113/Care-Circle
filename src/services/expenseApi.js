@@ -48,9 +48,15 @@ export const updateExpense = async (expenseId, expenseData) => {
   return response.data;
 };
 
+export const updateBudget = async (monthlyLimit) => {
+  const response = await expenseApi.put('/budget', { monthly_limit: monthlyLimit });
+  return response.data;
+};
+
 export default {
   getExpensesSummary,
   addExpense,
   deleteExpense,
   updateExpense,
+  updateBudget,
 };

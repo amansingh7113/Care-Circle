@@ -8,6 +8,7 @@ import CaregiverMedicinesScreen from '../screens/CaregiverMedicinesScreen';
 
 import TaskBoardScreen from '../screens/TaskBoardScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
+import TaskDetailScreen from '../screens/tasks/TaskDetailScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import DoctorVisitsScreen from '../screens/doctor/DoctorVisitsScreen';
 import AttachmentViewerScreen from '../screens/doctor/AttachmentViewerScreen';
@@ -18,6 +19,9 @@ import BloodPressureHistoryScreen from '../screens/home/BloodPressureHistoryScre
 import SleepDetailsScreen from '../screens/home/SleepDetailsScreen';
 import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import ManageCircleScreen from '../screens/settings/ManageCircleScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import StepHistoryScreen from '../screens/home/StepHistoryScreen';
+
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
@@ -36,6 +40,7 @@ const AppNavigator = () => {
         <>
           <Stack.Screen name="Dashboard" component={PatientDashboardScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </>
       ) : (
         <>
@@ -54,6 +59,9 @@ const AppNavigator = () => {
           <Stack.Screen name="SleepDetails" component={SleepDetailsScreen} />
           <Stack.Screen name="EditProfile" component={EditProfileScreen} />
           <Stack.Screen name="ManageCircle" component={ManageCircleScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
+          <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
+          <Stack.Screen name="StepHistory" component={StepHistoryScreen} />
         </>
       )}
     </Stack.Navigator>
