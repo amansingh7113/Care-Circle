@@ -31,7 +31,7 @@ doctorVisitApi.interceptors.request.use(
 export const getDoctorVisits = async (circleId) => {
   const query = circleId ? `?circle_id=${circleId}` : '';
   const response = await doctorVisitApi.get(`/${query}`);
-  return response.data;
+  return response.data.data || [];
 };
 
 export const addDoctorVisit = async (visitData) => {

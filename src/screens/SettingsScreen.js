@@ -18,19 +18,20 @@ const SettingsScreen = ({ navigation }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [isLoadingCode, setIsLoadingCode] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [inviteRole, setInviteRole] = useState('Caregiver');
 
   useEffect(() => {
-    generateInviteCode();
-  }, []);
+    generateInviteCode(inviteRole);
+  }, [inviteRole]);
 
-  const generateInviteCode = async () => {
+  const generateInviteCode = async (role) => {
     setIsLoadingCode(true);
     try {
       const token = useStore.getState().userSession;
       const circleId = user?.circle_id || useStore.getState().currentCircle?.id;
       if (!circleId) throw new Error('No circle selected');
       
-      const response = await axios.post(`${API_BASE_URL}/api/v1/circles/${circleId}/invite`, { role: 'Caregiver' }, {
+      const response = await axios.post(`${API_BASE_URL}/api/v1/circles/${circleId}/invite`, { role: role }, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (response.data.inviteCode) {
@@ -112,6 +113,18 @@ const SettingsScreen = ({ navigation }) => {
             <Text style={styles.inviteDescription}>
               Share this unique code with family members or caregivers to grant them secure access to this Care Circle.
             </Text>
+            
+            <View style={styles.roleSelector}>
+              {['Patient', 'Caregiver', 'Viewer'].map((role) => (
+                <TouchableOpacity 
+                  key={role}
+                  style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
+                  onPress={() => setInviteRole(role)}
+                >
+                  <Text style={[styles.rolePillText, inviteRole === role && styles.rolePillTextActive]}>{role}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             
             <View style={styles.codeContainer}>
               {isLoadingCode ? (
@@ -220,6 +233,31 @@ const styles = StyleSheet.create({
     color: THEME.colors.textBody,
     marginBottom: 16,
     lineHeight: 20
+  },
+  roleSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    backgroundColor: THEME.colors.canvas,
+    borderRadius: THEME.borderRadius.badge,
+    padding: 4
+  },
+  rolePill: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: THEME.borderRadius.badge,
+  },
+  rolePillActive: {
+    backgroundColor: THEME.colors.primary,
+  },
+  rolePillText: {
+    ...THEME.typography.label,
+    color: THEME.colors.textMuted,
+  },
+  rolePillTextActive: {
+    color: THEME.colors.cardBg,
+    fontWeight: 'bold',
   },
   codeContainer: {
     backgroundColor: `${THEME.colors.primary}10`,

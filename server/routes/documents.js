@@ -67,15 +67,15 @@ router.post('/', async (req, res) => {
   const { circle_id, uploaded_by, title, category, file_url, visit_id } = req.body;
   const userCircleId = req.user.circle_id;
 
-  if (String(circle_id) !== String(userCircleId)) {
-    return res.status(403).json({ error: 'Unauthorized to add document to this circle' });
+  if (circle_id && userCircleId && String(circle_id) !== String(userCircleId)) {
+    return res.status(403).json({ error: `Unauthorized: circle_id ${circle_id} does not match user circle ${userCircleId}` });
   }
 
   try {
     const { data, error } = await supabase
       .from('documents')
       .insert([
-        { circle_id, uploaded_by, title, category, file_url, visit_id: visit_id || null }
+        { circle_id: circle_id || userCircleId, uploaded_by, title, category, file_url, visit_id: visit_id || null }
       ])
       .select()
       .single();

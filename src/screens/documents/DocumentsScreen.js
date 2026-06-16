@@ -24,8 +24,8 @@ const DocumentsScreen = ({ navigation }) => {
   const [pendingFile, setPendingFile] = useState(null);
   const [selectedVisitId, setSelectedVisitId] = useState(null);
 
-  const { user } = useStore();
-  const circleId = user?.circle_id;
+  const { user, currentCircle } = useStore();
+  const circleId = currentCircle?.id || user?.circle_id;
 
   const fetchDocsAndVisits = async () => {
     if (!circleId) return;
