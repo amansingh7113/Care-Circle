@@ -60,3 +60,13 @@ export const deleteDocument = async (documentId) => {
     throw error;
   }
 };
+
+export const getUploadUrl = async (fileName) => {
+  try {
+    const response = await documentsApi.post('/upload-url', { fileName });
+    return response.data;
+  } catch (error) {
+    console.error('Error getting upload URL:', error);
+    throw error;
+  }
+};

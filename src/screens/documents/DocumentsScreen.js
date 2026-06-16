@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
-import { getDocuments, addDocumentMetadata, deleteDocument } from '../../services/documentsApi';
+import { getDocuments, addDocumentMetadata, deleteDocument, getUploadUrl } from '../../services/documentsApi';
 import { getDoctorVisits } from '../../services/doctorVisitApi';
 import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';
@@ -83,18 +83,25 @@ const DocumentsScreen = ({ navigation }) => {
       
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${circleId}/${fileName}`;
+
+      // Get signed upload URL from backend
+      const { signedUrl, filePath } = await getUploadUrl(fileName);
 
       const response = await fetch(file.uri);
       const arrayBuffer = await response.arrayBuffer();
 
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, arrayBuffer, {
-          contentType: file.mimeType || 'application/octet-stream'
-        });
+      // Upload directly to Supabase using the signed URL
+      const uploadResponse = await fetch(signedUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': file.mimeType || 'application/octet-stream'
+        },
+        body: arrayBuffer
+      });
 
-      if (uploadError) throw uploadError;
+      if (!uploadResponse.ok) {
+        throw new Error(`Upload failed with status ${uploadResponse.status}`);
+      }
 
       const { data: { publicUrl } } = supabase.storage
         .from('documents')

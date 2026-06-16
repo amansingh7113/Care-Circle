@@ -6,12 +6,19 @@ import { syncSteps } from '../services/stepApi';
 
 export default function StepTrackerService() {
   const currentCircle = useStore(state => state.currentCircle);
+  const user = useStore(state => state.user);
+  
   const subscriptionRef = useRef(null);
   const lastSyncTimeRef = useRef(Date.now());
   const currentStepsRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Only track steps if the current user is the Patient
+    if (user?.role !== 'Patient') {
+      return;
+    }
 
     const startTracking = async () => {
       try {
