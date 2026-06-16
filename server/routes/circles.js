@@ -29,7 +29,8 @@ router.use(authenticate);
 
 // 0. Fetch user circles
 router.get('/', async (req, res) => {
-  const user_id = req.user.id;
+  try {
+    const user_id = req.user.id;
 
   const { data: userRecords, error } = await supabase
     .from('users')
@@ -48,12 +49,17 @@ router.get('/', async (req, res) => {
   }));
 
   res.status(200).json({ circles });
+  } catch (err) {
+    console.error('Fetch circles catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 1. Create a new care circle
 router.post('/', async (req, res) => {
-  const { name, user_name } = req.body;
-  const user_id = req.user.id;
+  try {
+    const { name, user_name } = req.body;
+    const user_id = req.user.id;
 
   if (!name) {
     return res.status(400).json({ error: 'Circle name is required' });
@@ -90,11 +96,16 @@ router.post('/', async (req, res) => {
     message: 'Circle created successfully',
     circle
   });
+  } catch (err) {
+    console.error('Create circle catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 2. Fetch details for a specific care circle
 router.get('/:id', async (req, res) => {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
   // We check if the user requesting is part of this circle, though RLS does it too.
   if (req.user.circle_id && req.user.circle_id !== id) {
@@ -128,12 +139,17 @@ router.get('/:id', async (req, res) => {
     circle,
     members
   });
+  } catch (err) {
+    console.error('Get circle catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 3. Generate invite code
 router.post('/:id/invite', async (req, res) => {
-  const { id } = req.params;
-  const { role } = req.body;
+  try {
+    const { id } = req.params;
+    const { role } = req.body;
 
   if (!role || !['Admin', 'Caregiver', 'Viewer', 'Patient'].includes(role)) {
     return res.status(400).json({ error: 'Valid role is required' });
@@ -154,6 +170,10 @@ router.post('/:id/invite', async (req, res) => {
     inviteCode,
     role
   });
+  } catch (err) {
+    console.error('Generate invite catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 4. Join a circle

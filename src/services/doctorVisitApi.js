@@ -39,7 +39,19 @@ export const addDoctorVisit = async (visitData) => {
   return response.data;
 };
 
+export const deleteDoctorVisit = async (visitId) => {
+  const response = await doctorVisitApi.delete(`/${visitId}`);
+  return response.data;
+};
+
+export const updateDoctorVisit = async (visitId, visitData) => {
+  const response = await doctorVisitApi.patch(`/${visitId}`, visitData);
+  return response.data;
+};
+
 export default {
   getDoctorVisits,
   addDoctorVisit,
+  deleteDoctorVisit,
+  updateDoctorVisit,
 };

@@ -48,8 +48,20 @@ export const updateTaskStatus = async (taskId, updateData) => {
   return response.data;
 };
 
+export const updateTask = async (taskId, updateData) => {
+  const response = await taskApi.patch(`/${taskId}`, updateData);
+  return response.data;
+};
+
+export const deleteTask = async (taskId) => {
+  const response = await taskApi.delete(`/${taskId}`);
+  return response.data;
+};
+
 export default {
   getTasks,
   createTask,
   updateTaskStatus,
+  updateTask,
+  deleteTask,
 };

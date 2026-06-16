@@ -1,26 +1,20 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated, Linking, Pressable } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated, Linking, Pressable, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Pill } from 'lucide-react-native';
 import { getCircleDetails } from '../services/circleApi';
 import { getSleepLogs } from '../services/sleepApi';
-import { getMedicines } from '../services/medicineApi';
+import { getMedicines, logAdministration } from '../services/medicineApi';
 import { getVitals } from '../services/vitalsApi';
 import { getSteps } from '../services/stepApi';
+import { getDashboardAggregated } from '../services/dashboardApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
-import LogBloodPressureModal from './home/LogBloodPressureModal';
 import { useStore } from '../store/useStore';
 
-const mockActivities = [
-  { id: '1', user: 'Aman', action: 'completed a task', time: '10m ago', color: THEME.colors.success },
-  { id: '2', user: 'Anshika', action: 'updated medication schedule', time: '2h ago', color: THEME.colors.primary },
-  { id: '3', user: 'Rahul', action: 'logged blood pressure', time: '5h ago', color: THEME.colors.secondary },
-];
-
-const mockVitals = [
+const vitalsConfig = [
   { id: '1', label: 'Blood Pressure', value: '120/80', icon: '❤️', color: THEME.colors.alert },
   { id: '2', label: 'Medication', value: 'In 30 Mins', icon: 'Pill', color: THEME.colors.primary, subLabel: 'Aspirin • 81mg', upcoming: true },
   { id: '3', label: 'Daily Steps', value: '0', icon: '👣', color: '#3BA0E3' }, // custom blue
@@ -31,9 +25,11 @@ const DashboardScreen = ({ route, navigation }) => {
   const { circleId, circleName = 'My Circle' } = route.params || {};
   const [members, setMembers] = useState([]);
   const [medicines, setMedicines] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [bpModalVisible, setBpModalVisible] = useState(false);
   const { bloodPressureLogs, sleepLogs, stepLogs, setBloodPressureLogs, setSleepLogs, setStepLogs, user } = useStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const [loggingMedId, setLoggingMedId] = useState(null);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const holdProgress = useRef(new Animated.Value(0)).current;
@@ -131,38 +127,74 @@ const DashboardScreen = ({ route, navigation }) => {
     }, [circleId])
   );
 
-  const fetchCircleData = async () => {
+  const fetchCircleData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Run API calls in parallel for better performance
-      const [circleData, sleepData, vitalsData, medsData, stepsData] = await Promise.all([
+      const [circleData, dashboardData] = await Promise.all([
         getCircleDetails(circleId).catch(() => ({ members: [] })),
-        getSleepLogs(circleId).catch(() => []),
-        getVitals(circleId).catch(() => []),
-        getMedicines(circleId).catch(() => ({ medicines: [] })),
-        getSteps(circleId).catch(() => [])
+        getDashboardAggregated(circleId).catch(() => ({ vitals: [], sleep: [], steps: [], medicines: [], tasks: [] }))
       ]);
       
       setMembers(circleData?.members || []);
-      setSleepLogs(Array.isArray(sleepData) ? sleepData : []);
-      setBloodPressureLogs(Array.isArray(vitalsData) ? vitalsData : []);
-      setMedicines(medsData?.medicines || (Array.isArray(medsData) ? medsData : []));
-      setStepLogs(Array.isArray(stepsData) ? stepsData : []);
+      setSleepLogs(Array.isArray(dashboardData?.sleep) ? dashboardData.sleep : []);
+      setBloodPressureLogs(Array.isArray(dashboardData?.vitals) ? dashboardData.vitals : []);
+      setMedicines(dashboardData?.medicines || (Array.isArray(dashboardData?.medicines) ? dashboardData.medicines : []));
+      setStepLogs(Array.isArray(dashboardData?.steps) ? dashboardData.steps : []);
+      setTasks(Array.isArray(dashboardData?.tasks) ? dashboardData.tasks : []);
     } catch (error) {
       console.error('Failed to fetch dashboard data', error);
       Alert.alert('Error', 'Failed to load some dashboard details');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [circleId, setBloodPressureLogs, setSleepLogs, setStepLogs]);
 
   const getInitials = (name) => {
     return name ? name.substring(0, 2).toUpperCase() : 'U';
   };
 
+  const getMedTime = (med) => med?.time || med?.scheduled_time || (med?.instructions?.scheduled_times ? med.instructions.scheduled_times[0] : 'Upcoming');
+
+  const pendingMeds = (medicines || []).filter(m => m.status !== 'taken');
+  const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
+
+  const handleLogNextMed = async () => {
+    if (!nextMed) return;
+    
+    const previousStatus = nextMed.status;
+    // Optimistic Update
+    setMedicines(current => current.map(m => m.id === nextMed.id ? { ...m, status: 'taken' } : m));
+    setLoggingMedId(nextMed.id);
+    
+    try {
+      const scheduledTime = nextMed.scheduled_time || (nextMed.instructions?.scheduled_times ? nextMed.instructions.scheduled_times[0] : null);
+      await logAdministration(nextMed.id, 'taken', scheduledTime);
+      setLoggingMedId(null);
+    } catch (error) {
+      // Revert on failure
+      setMedicines(current => current.map(m => m.id === nextMed.id ? { ...m, status: previousStatus } : m));
+      setLoggingMedId(null);
+      Alert.alert('Error', 'Failed to log medication. Please try again.');
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchCircleData();
+    setRefreshing(false);
+  }, [circleId, fetchCircleData]);
+
   return (
     <View style={styles.safeArea}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.colors.primary]} />
+        }
+      >
         
         {/* Module: Emergency SOS Banner */}
         <View style={styles.sosSection}>
@@ -195,11 +227,41 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         </View>
 
+        {/* Module: Single-Tap Interactive Medication Card */}
+        {nextMed && (
+          <View style={styles.nextMedSection}>
+            <View style={styles.nextMedCard}>
+              <View style={styles.nextMedInfo}>
+                <View style={styles.nextMedHeader}>
+                  <Text style={styles.nextMedTime}>{getMedTime(nextMed)}</Text>
+                  <Animated.View style={{ opacity: pulseAnim, marginLeft: 8 }}>
+                    <Pill size={20} color={THEME.colors.white} />
+                  </Animated.View>
+                </View>
+                <Text style={styles.nextMedName}>{nextMed.name}</Text>
+                <Text style={styles.nextMedDosage}>{nextMed.dosage}</Text>
+              </View>
+              <TouchableOpacity 
+                style={[styles.logButton, loggingMedId === nextMed.slot_id && styles.logButtonDisabled]}
+                onPress={handleLogNextMed}
+                disabled={loggingMedId === nextMed.slot_id}
+                activeOpacity={0.8}
+              >
+                {loggingMedId === nextMed.slot_id ? (
+                  <ActivityIndicator color={THEME.colors.primary} />
+                ) : (
+                  <Text style={styles.logButtonText}>TAKE NOW</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* Module B: Wellness Vitals Quick-Grid */}
         <View style={styles.vitalsSection}>
           <Text style={styles.sectionTitle}>Vitals</Text>
           <View style={styles.vitalsGrid}>
-            {mockVitals.map(vital => {
+            {vitalsConfig.map(vital => {
               const isBP = vital.label === 'Blood Pressure';
               const isSleep = vital.label === 'Sleep';
               const isMedication = vital.label === 'Medication';
@@ -220,9 +282,7 @@ const DashboardScreen = ({ route, navigation }) => {
                 const pendingMeds = (medicines || []).filter(m => m.status !== 'taken');
                 const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
                 currentUpcoming = !!nextMed;
-                displayValue = nextMed 
-                  ? (nextMed.time || (nextMed.instructions?.scheduled_times ? nextMed.instructions.scheduled_times[0] : 'Upcoming'))
-                  : 'All Taken';
+                displayValue = nextMed ? getMedTime(nextMed) : 'All Taken';
                 currentSubLabel = nextMed 
                   ? `${nextMed.name}${nextMed.dosage ? ` • ${nextMed.dosage}` : ''}`
                   : 'No pending meds';
@@ -233,10 +293,10 @@ const DashboardScreen = ({ route, navigation }) => {
                   key={vital.id} 
                   style={styles.vitalCard}
                   onPress={() => {
-                    if (isBP) setBpModalVisible(true);
+                    if (isBP) navigation.navigate('BloodPressureHistory');
                     if (isMedication) navigation.navigate('MedicineTracker');
                     if (isSleep) {
-                      // In future iterations we can show a detailed sleep graph modal here
+                      navigation.navigate('SleepDetails');
                     }
                   }}
                   activeOpacity={(isBP || isSleep || isMedication) ? 0.7 : 1}
@@ -269,31 +329,25 @@ const DashboardScreen = ({ route, navigation }) => {
 
         {/* Module A: Live Care Circle Activity Feed Timeline */}
         <View style={styles.activitySection}>
-          <Text style={styles.sectionTitle}>Activity Feed</Text>
+          <Text style={styles.sectionTitle}>Task Feed</Text>
           <View style={styles.timelineContainer}>
-            {mockActivities.map((activity, index) => (
-              <View key={activity.id} style={styles.timelineItem}>
+            {tasks.slice(0, 5).map((task, index) => (
+              <View key={task.id} style={styles.timelineItem}>
                 <View style={styles.timelineLeft}>
-                  <View style={[styles.timelineIconBadge, { backgroundColor: `${activity.color}20` }]}>
-                     {/* Replace with actual icons based on action type */}
-                     {activity.action.includes('medication') || activity.action.includes('Meds') ? (
-                       <Text style={{fontSize: 12}}>💊</Text>
-                     ) : activity.action.includes('blood pressure') || activity.action.includes('Vitals') ? (
-                       <Text style={{fontSize: 12}}>❤️</Text>
-                     ) : (
+                  <View style={[styles.timelineIconBadge, { backgroundColor: `${THEME.colors.success}20` }]}>
                        <Text style={{fontSize: 12}}>📋</Text>
-                     )}
                   </View>
-                  {index !== mockActivities.length - 1 && <View style={styles.timelineLine} />}
+                  {index !== Math.min(tasks.length, 5) - 1 && <View style={styles.timelineLine} />}
                 </View>
                 <View style={styles.timelineContent}>
                   <Text style={styles.activityText}>
-                    <Text style={styles.activityUser}>{activity.user}</Text> {activity.action}
+                    <Text style={styles.activityUser}>{task.assigned_to ? members.find(m => m.id === task.assigned_to)?.name || 'Someone' : 'Anyone'}</Text> needs to complete: {task.title}
                   </Text>
-                  <Text style={styles.activityTime}>{activity.time.toUpperCase()}</Text>
+                  <Text style={styles.activityTime}>{task.status.toUpperCase()}</Text>
                 </View>
               </View>
             ))}
+            {tasks.length === 0 && <Text style={{color: THEME.colors.textMuted, marginTop: 10, textAlign: 'center'}}>No pending tasks!</Text>}
           </View>
         </View>
 
@@ -346,15 +400,13 @@ const DashboardScreen = ({ route, navigation }) => {
         <SafeAreaView>
           <View style={styles.headerContainer}>
             <Text style={styles.header}>{circleName}</Text>
-            <TouchableOpacity style={styles.settingsIcon}>
+            <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
                {/* Gear icon placeholder */}
                <Text style={{fontSize: 24, color: THEME.colors.primary}}>⚙️</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
       </BlurView>
-
-      <LogBloodPressureModal visible={bpModalVisible} onClose={() => setBpModalVisible(false)} />
     </View>
   );
 };
@@ -417,6 +469,32 @@ const styles = StyleSheet.create({
   progressInfo: { marginLeft: 24, flex: 1 },
   progressValue: { ...THEME.typography.header, fontSize: 32, marginBottom: 4 },
   progressLabel: { ...THEME.typography.label, color: THEME.colors.textBody },
+  
+  // Next Medication Card Styles
+  nextMedSection: { marginBottom: 24 },
+  nextMedCard: {
+    backgroundColor: THEME.colors.primary,
+    borderRadius: THEME.borderRadius.card,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...THEME.shadows.medium,
+  },
+  nextMedInfo: { flex: 1, marginRight: 16 },
+  nextMedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  nextMedTime: { color: THEME.colors.white, fontWeight: '700', fontSize: 16 },
+  nextMedName: { color: THEME.colors.white, fontSize: 22, fontWeight: '800', marginBottom: 2 },
+  nextMedDosage: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
+  logButton: {
+    backgroundColor: THEME.colors.white,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+    ...THEME.shadows.soft,
+  },
+  logButtonDisabled: { opacity: 0.7 },
+  logButtonText: { color: THEME.colors.primary, fontWeight: '800', fontSize: 14 },
   
   // Vitals Grid Styles
   vitalsSection: { marginBottom: 28 },

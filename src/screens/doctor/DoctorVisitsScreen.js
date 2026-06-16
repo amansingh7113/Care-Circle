@@ -10,22 +10,29 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { getDoctorVisits, addDoctorVisit } from '../../services/doctorVisitApi';
+import { getDoctorVisits, addDoctorVisit, deleteDoctorVisit, updateDoctorVisit } from '../../services/doctorVisitApi';
+import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import { supabase } from '../../services/supabase';
 
 const PRIMARY_BLUE = '#1A73E8';
 const TOUCH_TARGET_SIZE = 48;
 
-const DoctorVisitsScreen = () => {
+const DoctorVisitsScreen = ({ navigation }) => {
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingVisitId, setEditingVisitId] = useState(null);
 
   // Form State
   const [doctorName, setDoctorName] = useState('');
   const [visitDate, setVisitDate] = useState('');
   const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
+  const [attachments, setAttachments] = useState([]);
 
   useEffect(() => {
     fetchVisits();
@@ -43,7 +50,40 @@ const DoctorVisitsScreen = () => {
     }
   };
 
-  const handleAddVisit = async () => {
+  const handleAttach = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+        multiple: true,
+      });
+
+      if (!result.canceled && result.assets) {
+        setAttachments([...attachments, ...result.assets]);
+      }
+    } catch (err) {
+      console.error('Error picking document:', err);
+      Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
+  const openAddModal = () => {
+    setEditingVisitId(null);
+    resetForm();
+    setModalVisible(true);
+  };
+
+  const openEditModal = (visit) => {
+    setEditingVisitId(visit.id);
+    setDoctorName(visit.doctor_name || '');
+    setVisitDate(visit.visit_date || '');
+    setReason(visit.reason || '');
+    setNotes(visit.notes || '');
+    setAttachments([]);
+    setModalVisible(true);
+  };
+
+  const handleSaveVisit = async () => {
     // Basic validation could go here
     if (!doctorName || !visitDate) {
       Alert.alert('Error', 'Please provide at least a Doctor Name and Date');
@@ -52,21 +92,81 @@ const DoctorVisitsScreen = () => {
     
     try {
       setLoading(true);
-      await addDoctorVisit({
+
+      const attachment_urls = [];
+      for (const file of attachments) {
+        const formData = new FormData();
+        formData.append('file', {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/octet-stream'
+        });
+        
+        const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+        const { data, error } = await supabase.storage
+          .from('documents')
+          .upload(fileName, formData);
+          
+        if (data) {
+           const { data: publicData } = supabase.storage.from('documents').getPublicUrl(fileName);
+           attachment_urls.push(publicData.publicUrl);
+        } else if (error) {
+           console.error('Upload error:', error);
+        }
+      }
+
+      const visitPayload = {
         doctor_name: doctorName,
         visit_date: visitDate,
         reason,
         notes,
-        attachment_urls: [],
-      });
+      };
+
+      if (editingVisitId) {
+        const existingVisit = visits.find(v => v.id === editingVisitId);
+        if (existingVisit && existingVisit.attachment_urls) {
+          visitPayload.attachment_urls = [...existingVisit.attachment_urls, ...attachment_urls];
+        } else {
+          visitPayload.attachment_urls = attachment_urls;
+        }
+        await updateDoctorVisit(editingVisitId, visitPayload);
+      } else {
+        visitPayload.attachment_urls = attachment_urls;
+        await addDoctorVisit(visitPayload);
+      }
+
       setModalVisible(false);
       resetForm();
       fetchVisits();
     } catch (error) {
-       console.error('Failed to add visit', error);
-       Alert.alert('Error', 'Failed to add visit');
+       console.error('Failed to save visit', error);
+       Alert.alert('Error', 'Failed to save visit');
        setLoading(false);
     }
+  };
+
+  const handleDeleteVisit = (visitId) => {
+    Alert.alert(
+      'Delete Visit',
+      'Are you sure you want to delete this doctor visit record?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteDoctorVisit(visitId);
+              fetchVisits();
+            } catch (error) {
+              console.error('Failed to delete visit', error);
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const resetForm = () => {
@@ -74,6 +174,7 @@ const DoctorVisitsScreen = () => {
     setVisitDate('');
     setReason('');
     setNotes('');
+    setAttachments([]);
   };
 
   const formatDate = (dateString) => {
@@ -91,7 +192,7 @@ const DoctorVisitsScreen = () => {
     <TouchableOpacity
       key={index}
       style={styles.attachmentChip}
-      onPress={() => console.log(`[OPEN ATTACHMENT VIEW FOR URL]: ${url}`)}
+      onPress={() => navigation.navigate('AttachmentViewer', { url })}
     >
       <Text style={styles.attachmentText}>Attachment {index + 1}</Text>
     </TouchableOpacity>
@@ -106,11 +207,23 @@ const DoctorVisitsScreen = () => {
       </View>
 
       {/* Card Content */}
-      <View style={styles.card}>
+      <TouchableOpacity 
+        style={styles.card}
+        onLongPress={() => handleDeleteVisit(item.id)}
+        activeOpacity={0.8}
+      >
         <View style={styles.cardHeader}>
           <Text style={styles.doctorName}>{item.doctor_name}</Text>
-          <Text style={styles.visitDate}>{formatDate(item.visit_date)}</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <TouchableOpacity onPress={() => openEditModal(item)} style={{padding: 4, marginRight: 8}}>
+              <Ionicons name="pencil" size={16} color={PRIMARY_BLUE} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => handleDeleteVisit(item.id)} style={{padding: 4}}>
+              <Ionicons name="trash-outline" size={16} color="#E53935" />
+            </TouchableOpacity>
+          </View>
         </View>
+        <Text style={styles.visitDate}>{formatDate(item.visit_date)}</Text>
 
         {!!item.reason && (
           <Text style={styles.reasonText}>Reason: {item.reason}</Text>
@@ -127,7 +240,7 @@ const DoctorVisitsScreen = () => {
             {item.attachment_urls.map((url, i) => renderAttachment(url, i))}
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     </View>
   );
 
@@ -137,7 +250,7 @@ const DoctorVisitsScreen = () => {
         <Text style={styles.headerTitle}>Doctor Visits</Text>
         <TouchableOpacity
           style={styles.addIconBtn}
-          onPress={() => setModalVisible(true)}
+          onPress={openAddModal}
         >
           <Text style={styles.addIconText}>+</Text>
         </TouchableOpacity>
@@ -166,7 +279,10 @@ const DoctorVisitsScreen = () => {
         presentationStyle="pageSheet"
         onRequestClose={() => setModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <KeyboardAvoidingView 
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add Visit Log</Text>
             <TouchableOpacity
@@ -210,19 +326,19 @@ const DoctorVisitsScreen = () => {
 
             <TouchableOpacity
               style={styles.attachBtn}
-              onPress={() => console.log('Attach Documents pressed')}
+              onPress={handleAttach}
             >
-              <Text style={styles.attachBtnText}>[Attach Documents]</Text>
+              <Text style={styles.attachBtnText}>[Attach Documents] ({attachments.length} selected)</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.submitBtn}
-              onPress={handleAddVisit}
+              onPress={handleSaveVisit}
             >
               <Text style={styles.submitBtnText}>Save Visit</Text>
             </TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

@@ -8,16 +8,25 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
+  ScrollView,
 } from 'react-native';
-import { getExpensesSummary, addExpense } from '../../services/expenseApi';
+import { getExpensesSummary, addExpense, deleteExpense, updateExpense } from '../../services/expenseApi';
+import useStore from '../../store/useStore';
+import { Ionicons } from '@expo/vector-icons';
 
 const ExpensesScreen = () => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ total_spent: 0, monthly_limit: 0, items: [] });
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Medical');
+  const circleId = useStore(state => state.currentCircleId);
 
   useEffect(() => {
     fetchExpensesSummary();
@@ -35,18 +44,64 @@ const ExpensesScreen = () => {
     }
   };
 
-  const handleAddExpense = async () => {
-    if (!amount) return;
+  const openAddModal = () => {
+    setEditingExpenseId(null);
+    setAmount('');
+    setDescription('');
+    setCategory('Medical');
+    setModalVisible(true);
+  };
+
+  const openEditModal = (expense) => {
+    setEditingExpenseId(expense.id);
+    setAmount(expense.amount.toString());
+    setDescription(expense.description || '');
+    setCategory(expense.category || 'Medical');
+    setModalVisible(true);
+  };
+
+  const handleSaveExpense = async () => {
+    if (!amount || !description) return;
     try {
       setLoading(true);
-      await addExpense({ amount: Number(amount), category, description: 'Added via app' });
+      const payload = { amount: Number(amount), category, description, circle_id: circleId };
+      if (editingExpenseId) {
+        await updateExpense(editingExpenseId, payload);
+      } else {
+        await addExpense(payload);
+      }
       setModalVisible(false);
       setAmount('');
+      setDescription('');
       fetchExpensesSummary();
     } catch (error) {
-      console.error('Failed to add expense', error);
+      console.error('Failed to save expense', error);
       setLoading(false);
     }
+  };
+
+  const handleDeleteExpense = (expenseId) => {
+    Alert.alert(
+      'Delete Expense',
+      'Are you sure you want to delete this expense?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+              await deleteExpense(expenseId);
+              fetchExpensesSummary();
+            } catch (error) {
+              console.error('Failed to delete expense', error);
+              setLoading(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const consumptionPercentage = summary.monthly_limit > 0 
@@ -57,13 +112,25 @@ const ExpensesScreen = () => {
   const progressBarColor = isOverBudget ? '#D32F2F' : '#1A73E8';
 
   const renderItem = ({ item }) => (
-    <View style={styles.transactionItem}>
-      <View>
+    <TouchableOpacity 
+      style={styles.transactionItem}
+      onLongPress={() => handleDeleteExpense(item.id)}
+      activeOpacity={0.8}
+    >
+      <View style={{flex: 1}}>
         <Text style={styles.transactionCategory}>{item.category}</Text>
         <Text style={styles.transactionDescription}>{item.description}</Text>
       </View>
-      <Text style={styles.transactionAmount}>₹{item.amount}</Text>
-    </View>
+      <View style={{flexDirection: 'row', alignItems: 'center'}}>
+        <Text style={[styles.transactionAmount, {marginRight: 12}]}>₹{item.amount}</Text>
+        <TouchableOpacity onPress={() => openEditModal(item)} style={{padding: 4, marginRight: 4}}>
+          <Ionicons name="pencil" size={18} color="#1A73E8" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleDeleteExpense(item.id)} style={{padding: 4}}>
+          <Ionicons name="trash-outline" size={18} color="#D32F2F" />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
   );
 
   return (
@@ -97,7 +164,7 @@ const ExpensesScreen = () => {
 
       <TouchableOpacity 
         style={styles.fab} 
-        onPress={() => setModalVisible(true)}
+        onPress={openAddModal}
         activeOpacity={0.8}
       >
         <Text style={styles.fabIcon}>+</Text>
@@ -109,9 +176,13 @@ const ExpensesScreen = () => {
         transparent={true}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Expense</Text>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalTitle}>{editingExpenseId ? 'Edit Expense' : 'Add Expense'}</Text>
             
             <TextInput
               style={styles.input}
@@ -119,6 +190,13 @@ const ExpensesScreen = () => {
               keyboardType="numeric"
               value={amount}
               onChangeText={setAmount}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Description"
+              value={description}
+              onChangeText={setDescription}
             />
 
             <View style={styles.categoryPickerContainer}>
@@ -142,15 +220,13 @@ const ExpensesScreen = () => {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.button, styles.saveButton]} 
-                onPress={handleAddExpense}
-              >
+              <TouchableOpacity style={[styles.button, styles.saveButton]} onPress={handleSaveExpense}>
                 <Text style={styles.saveButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
+            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -243,6 +319,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 20,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 18,

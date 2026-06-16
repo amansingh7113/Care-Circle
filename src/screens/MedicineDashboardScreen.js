@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput, Platform, ScrollView, KeyboardAvoidingView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { COMMON_MEDICINES } from '../utils/commonMedicines';
-import { getMedicines, logAdministration, addMedicine, deleteMedicine } from '../services/medicineApi';
+import { getMedicines, logAdministration, addMedicine, deleteMedicine, updateMedicine } from '../services/medicineApi';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
 import { THEME } from '../styles/theme';
@@ -21,6 +21,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
 
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);
+  const [editingMedicineId, setEditingMedicineId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -176,7 +177,51 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
     ]);
   };
 
-  const handleAddMedicine = async () => {
+  const openAddModal = () => {
+    setEditingMedicineId(null);
+    setFormData({ name: '', dosage: '', unit: 'mg', frequency: 'Daily', days: [], scheduled_times: [], stock_quantity: '30' });
+    setModalVisible(true);
+  };
+
+  const openEditModal = (medicine) => {
+    setEditingMedicineId(medicine.id);
+    
+    let dosageVal = medicine.dosage || '';
+    let unitVal = 'mg';
+    const match = dosageVal.match(/^(\d+)\s*([a-zA-Z]*)$/);
+    if (match) {
+      dosageVal = match[1];
+      if (match[2]) unitVal = match[2];
+    }
+    
+    let freqVal = 'Daily';
+    let daysVal = [];
+    let schedTimes = [medicine.scheduled_time || '08:00'];
+    
+    try {
+      if (medicine.instructions) {
+        const instr = typeof medicine.instructions === 'string' ? JSON.parse(medicine.instructions) : medicine.instructions;
+        freqVal = instr.frequency || 'Daily';
+        daysVal = instr.days || [];
+        if (instr.scheduled_times && instr.scheduled_times.length > 0) {
+          schedTimes = instr.scheduled_times;
+        }
+      }
+    } catch(e) {}
+    
+    setFormData({
+      name: medicine.name,
+      dosage: dosageVal,
+      unit: unitVal,
+      frequency: freqVal,
+      days: daysVal,
+      scheduled_times: schedTimes,
+      stock_quantity: (medicine.stock_quantity || 30).toString()
+    });
+    setModalVisible(true);
+  };
+
+  const handleSaveMedicine = async () => {
     if (!formData.name || !formData.dosage || formData.scheduled_times.length === 0) {
       Alert.alert('Error', 'Please fill in all required fields and add at least one scheduled time.');
       return;
@@ -198,16 +243,23 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
         refill_alert_threshold: automatedRefillThreshold
       };
 
-      await addMedicine(circleId, payload);
+      if (editingMedicineId) {
+        await updateMedicine(editingMedicineId, payload);
+        Alert.alert('Success', 'Medicine updated successfully');
+      } else {
+        await addMedicine(circleId, payload);
+        Alert.alert('Success', 'Medicine added successfully');
+      }
+
       setModalVisible(false);
+      setEditingMedicineId(null);
       setFormData({ name: '', dosage: '', unit: 'mg', frequency: 'Daily', days: [], scheduled_times: [], stock_quantity: '30' });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', 'Medicine added successfully');
       fetchMedicines(); // refresh
 
     } catch (error) {
-      console.log('Failed to add medicine', error);
-      Alert.alert('Error', 'Failed to add medicine. Please try again.');
+      console.log('Failed to save medicine', error);
+      Alert.alert('Error', 'Failed to save medicine. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -233,9 +285,14 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
           <View style={styles.cardInfo}>
             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4}}>
               <Text style={styles.medName}>{item.name}</Text>
-              <TouchableOpacity onPress={() => handleDelete(item.id)} style={{padding: 4}}>
-                <Ionicons name="trash-outline" size={20} color={THEME.colors.alert} />
-              </TouchableOpacity>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <TouchableOpacity onPress={() => openEditModal(item)} style={{padding: 4, marginRight: 8}}>
+                  <Ionicons name="pencil" size={20} color={THEME.colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleDelete(item.id)} style={{padding: 4}}>
+                  <Ionicons name="trash-outline" size={20} color={THEME.colors.alert} />
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 6}}>
               <Ionicons name="time-outline" size={14} color={THEME.colors.textMuted} style={{marginRight: 4}} />
@@ -287,7 +344,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
           <TouchableOpacity onPress={() => navigation.navigate('MedicineAnalytics')} style={{ marginRight: 16 }}>
             <Ionicons name="pie-chart" size={32} color={THEME.colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setModalVisible(true)}>
+          <TouchableOpacity onPress={openAddModal}>
             <Ionicons name="add-circle" size={36} color={THEME.colors.primary} />
           </TouchableOpacity>
         </View>
@@ -319,8 +376,12 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
       {/* Add Medicine Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { maxHeight: '90%' }]}>
-            <Text style={styles.modalTitle}>Add New Medicine</Text>
+          <KeyboardAvoidingView 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            <View style={[styles.modalContent, { maxHeight: '90%' }]}>
+              <Text style={styles.modalTitle}>{editingMedicineId ? 'Edit Medicine' : 'Add New Medicine'}</Text>
             
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="always">
               <View style={[styles.inputGroup, { zIndex: 10 }]}>
@@ -489,7 +550,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)} disabled={isSubmitting}>
                 <Text style={styles.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveBtn} onPress={handleAddMedicine} disabled={isSubmitting}>
+              <TouchableOpacity style={styles.saveBtn} onPress={handleSaveMedicine} disabled={isSubmitting}>
                 {isSubmitting ? (
                   <ActivityIndicator color={THEME.colors.white} />
                 ) : (
@@ -497,7 +558,8 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 

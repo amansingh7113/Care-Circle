@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { createTask } from '../services/taskApi';
+import { createTask, updateTask } from '../services/taskApi';
 import { useStore } from '../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../styles/theme';
@@ -8,23 +8,32 @@ import { THEME } from '../styles/theme';
 const CreateTaskScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
   const circleId = route.params?.circleId || currentCircle?.id;
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [dueDate, setDueDate] = useState('');
-  const [assignee, setAssignee] = useState('');
+  const taskToEdit = route.params?.taskToEdit;
+  const isEditing = !!taskToEdit;
+  
+  const [title, setTitle] = useState(taskToEdit?.title || '');
+  const [description, setDescription] = useState(taskToEdit?.description || '');
+  const [category, setCategory] = useState(taskToEdit?.category || '');
+  const [dueDate, setDueDate] = useState(taskToEdit?.dueDate || taskToEdit?.due_date || '');
+  const [assignee, setAssignee] = useState(taskToEdit?.assignee || taskToEdit?.assigned_to || '');
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!title || !dueDate) {
       return Alert.alert('Error', 'Please provide a title and due date');
     }
 
     try {
-      await createTask(circleId, { title, description, category, due_date: dueDate, assigned_to: assignee, status: 'pending' });
-      Alert.alert('Success', 'Task created successfully');
+      const payload = { title, description, category, due_date: dueDate, assigned_to: assignee, status: taskToEdit?.status || 'pending' };
+      if (isEditing) {
+        await updateTask(taskToEdit.id, payload);
+        Alert.alert('Success', 'Task updated successfully');
+      } else {
+        await createTask(circleId, payload);
+        Alert.alert('Success', 'Task created successfully');
+      }
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error', 'Failed to create task');
+      Alert.alert('Error', isEditing ? 'Failed to update task' : 'Failed to create task');
     }
   };
 
@@ -38,7 +47,7 @@ const CreateTaskScreen = ({ route, navigation }) => {
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="arrow-back" size={24} color={THEME.colors.primary} />
           </TouchableOpacity>
-          <Text style={styles.header}>Create New Task</Text>
+          <Text style={styles.header}>{isEditing ? 'Edit Task' : 'Create New Task'}</Text>
         </View>
 
         <View style={styles.formGroup}>
@@ -66,8 +75,8 @@ const CreateTaskScreen = ({ route, navigation }) => {
           <TextInput style={styles.input} value={assignee} onChangeText={setAssignee} placeholder="e.g. User ID or Name" />
         </View>
 
-        <TouchableOpacity style={styles.submitBtn} onPress={handleCreate}>
-          <Text style={styles.submitBtnText}>Post Task</Text>
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
+          <Text style={styles.submitBtnText}>{isEditing ? 'Save Changes' : 'Post Task'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

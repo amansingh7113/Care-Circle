@@ -106,4 +106,40 @@ router.get('/summary', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const expenseId = req.params.id;
+    const userCircleId = req.user.circle_id;
+
+    const { data: exp, error: expError } = await supabase
+      .from('expenses')
+      .select('circle_id')
+      .eq('id', expenseId)
+      .single();
+
+    if (expError || !exp) {
+      return res.status(404).json({ error: 'Expense not found' });
+    }
+
+    if (String(exp.circle_id) !== String(userCircleId)) {
+      return res.status(403).json({ error: 'Unauthorized access to this expense' });
+    }
+
+    const { error } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('id', expenseId);
+
+    if (error) {
+      console.error('Delete expense error:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Expense deleted successfully' });
+  } catch (err) {
+    console.error('Delete expense catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

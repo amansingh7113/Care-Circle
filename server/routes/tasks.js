@@ -36,8 +36,9 @@ router.use(authenticate);
 
 // 1. POST /api/v1/tasks
 router.post('/', async (req, res) => {
-  const { title, description, category, due_date, assigned_to, circle_id } = req.body;
-  const userCircleId = req.user.circle_id;
+  try {
+    const { title, description, category, due_date, assigned_to, circle_id } = req.body;
+    const userCircleId = req.user.circle_id;
   const targetCircleId = circle_id || userCircleId;
 
   if (String(targetCircleId) !== String(userCircleId)) {
@@ -70,14 +71,19 @@ router.post('/', async (req, res) => {
   }
 
   res.status(201).json(data);
+  } catch (err) {
+    console.error('Create task catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 2. GET /api/v1/circles/:circleId/tasks 
 // (Mounted at /api/v1/tasks/circles/:circleId/tasks due to router mounting, similar to medicines)
 router.get('/circles/:circleId/tasks', async (req, res) => {
-  const { circleId } = req.params;
-  const { status } = req.query; // e.g., ?status=pending
-  const userCircleId = req.user.circle_id;
+  try {
+    const { circleId } = req.params;
+    const { status } = req.query; // e.g., ?status=pending
+    const userCircleId = req.user.circle_id;
 
   if (String(circleId) !== String(userCircleId)) {
     return res.status(403).json({ error: 'Unauthorized access to this circle' });
@@ -100,13 +106,18 @@ router.get('/circles/:circleId/tasks', async (req, res) => {
   }
 
   res.status(200).json(data);
+  } catch (err) {
+    console.error('Get tasks catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 3. PATCH /api/v1/tasks/:id
 router.patch('/:id', async (req, res) => {
-  const taskId = req.params.id;
-  const { title, description, category, due_date, assigned_to, status } = req.body;
-  const userCircleId = req.user.circle_id;
+  try {
+    const taskId = req.params.id;
+    const { title, description, category, due_date, assigned_to, status } = req.body;
+    const userCircleId = req.user.circle_id;
 
   // Verify task belongs to user's circle
   const { data: task, error: taskError } = await supabase
@@ -149,14 +160,19 @@ router.patch('/:id', async (req, res) => {
   }
 
   res.status(200).json(data);
+  } catch (err) {
+    console.error('Update task catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 // 4. POST /api/v1/tasks/:id/comments
 router.post('/:id/comments', async (req, res) => {
-  const taskId = req.params.id;
-  const { comment } = req.body;
-  const userCircleId = req.user.circle_id;
-  const userId = req.user.id;
+  try {
+    const taskId = req.params.id;
+    const { comment } = req.body;
+    const userCircleId = req.user.circle_id;
+    const userId = req.user.id;
 
   if (!comment) {
     return res.status(400).json({ error: 'Comment is required' });
@@ -196,6 +212,48 @@ router.post('/:id/comments', async (req, res) => {
   }
 
   res.status(201).json(data);
+  } catch (err) {
+    console.error('Add task comment catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 5. DELETE /api/v1/tasks/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const userCircleId = req.user.circle_id;
+
+    // Verify task belongs to user's circle
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('circle_id')
+      .eq('id', taskId)
+      .single();
+
+    if (taskError || !task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    if (String(task.circle_id) !== String(userCircleId)) {
+      return res.status(403).json({ error: 'Unauthorized access to this task' });
+    }
+
+    const { error } = await supabase
+      .from('tasks')
+      .delete()
+      .eq('id', taskId);
+
+    if (error) {
+      console.error('Delete task error:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Task deleted successfully' });
+  } catch (err) {
+    console.error('Delete task catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 module.exports = router;

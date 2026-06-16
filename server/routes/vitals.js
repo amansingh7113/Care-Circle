@@ -58,6 +58,10 @@ router.post('/', async (req, res) => {
     const { circle_id, systolic, diastolic, pulse, image_url } = req.body;
     const patient_id = req.user.id;
 
+    if (!circle_id || !systolic || !diastolic) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
     const { data, error } = await supabase
       .from('blood_pressure_logs')
       .insert([{
@@ -76,6 +80,45 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error adding vital log:', error);
     res.status(500).json({ error: 'Failed to add vital log' });
+  }
+});
+
+// PUT update blood pressure log
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { systolic, diastolic, pulse } = req.body;
+
+    const { data, error } = await supabase
+      .from('blood_pressure_logs')
+      .update({ systolic, diastolic, pulse })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.status(200).json(data);
+  } catch (error) {
+    console.error('Error updating vital log:', error);
+    res.status(500).json({ error: 'Failed to update vital log' });
+  }
+});
+
+// DELETE blood pressure log
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const { error } = await supabase
+      .from('blood_pressure_logs')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    res.status(200).json({ message: 'Vital log deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting vital log:', error);
+    res.status(500).json({ error: 'Failed to delete vital log' });
   }
 });
 

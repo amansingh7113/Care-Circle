@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, FlatList, 
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, 
-  Platform 
+  Platform, ScrollView
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
@@ -106,8 +106,9 @@ const CircleSelectionScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView 
       style={{ flex: 1, backgroundColor: THEME.colors.canvas }} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <ScrollView contentContainerStyle={{flexGrow: 1}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.topSection}>
         <Text style={styles.welcomeText}>WELCOME, USER</Text>
         {/* Placeholder for top vector graphic */}
@@ -189,6 +190,7 @@ const CircleSelectionScreen = ({ navigation }) => {
            <View style={{ width: 200, height: 100, backgroundColor: `${THEME.colors.primary}20`, borderRadius: 50, marginTop: 40 }} />
         </View>
       </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };

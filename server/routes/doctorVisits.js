@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
       .select();
 
     if (error) throw error;
-    res.status(201).json({ data: data[0] });
+    res.status(201).json({ data: data && data.length > 0 ? data[0] : null });
   } catch (err) {
     console.error('Add doctor visit error:', err);
     res.status(500).json({ error: err.message });
@@ -89,6 +89,39 @@ router.get('/', async (req, res) => {
     res.status(200).json({ data });
   } catch (err) {
     console.error('Get doctor visits error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/v1/doctor-visits/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const visitId = req.params.id;
+    const userCircleId = req.user.circle_id;
+
+    const { data: visit, error: visitError } = await supabase
+      .from('doctor_visits')
+      .select('circle_id')
+      .eq('id', visitId)
+      .single();
+
+    if (visitError || !visit) {
+      return res.status(404).json({ error: 'Doctor visit not found' });
+    }
+
+    if (String(visit.circle_id) !== String(userCircleId)) {
+      return res.status(403).json({ error: 'Unauthorized access to this visit' });
+    }
+
+    const { error } = await supabase
+      .from('doctor_visits')
+      .delete()
+      .eq('id', visitId);
+
+    if (error) throw error;
+    res.status(200).json({ message: 'Doctor visit deleted successfully' });
+  } catch (err) {
+    console.error('Delete doctor visit error:', err);
     res.status(500).json({ error: err.message });
   }
 });

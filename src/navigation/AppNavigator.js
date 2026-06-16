@@ -5,15 +5,19 @@ import CircleSelectionScreen from '../screens/CircleSelectionScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import MedicineDashboardScreen from '../screens/MedicineDashboardScreen';
 import CaregiverMedicinesScreen from '../screens/CaregiverMedicinesScreen';
-import AddMedicineScreen from '../screens/AddMedicineScreen';
+
 import TaskBoardScreen from '../screens/TaskBoardScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import DoctorVisitsScreen from '../screens/doctor/DoctorVisitsScreen';
+import AttachmentViewerScreen from '../screens/doctor/AttachmentViewerScreen';
 import ExpensesScreen from '../screens/expenses/ExpensesScreen';
 import DocumentsScreen from '../screens/documents/DocumentsScreen';
 import PatientDashboardScreen from '../screens/medicines/PatientDashboardScreen';
-
+import BloodPressureHistoryScreen from '../screens/home/BloodPressureHistoryScreen';
+import SleepDetailsScreen from '../screens/home/SleepDetailsScreen';
+import EditProfileScreen from '../screens/settings/EditProfileScreen';
+import ManageCircleScreen from '../screens/settings/ManageCircleScreen';
 const Stack = createStackNavigator();
 
 const AppNavigator = () => {
@@ -38,13 +42,18 @@ const AppNavigator = () => {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="MedicineTracker" component={MedicineDashboardScreen} />
           <Stack.Screen name="MedicineAnalytics" component={CaregiverMedicinesScreen} />
-          <Stack.Screen name="AddMedicine" component={AddMedicineScreen} />
+
           <Stack.Screen name="TaskBoard" component={TaskBoardScreen} />
           <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Documents" component={DocumentsScreen} />
           <Stack.Screen name="DoctorVisits" component={DoctorVisitsScreen} />
+          <Stack.Screen name="AttachmentViewer" component={AttachmentViewerScreen} />
           <Stack.Screen name="Expenses" component={ExpensesScreen} />
+          <Stack.Screen name="BloodPressureHistory" component={BloodPressureHistoryScreen} />
+          <Stack.Screen name="SleepDetails" component={SleepDetailsScreen} />
+          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+          <Stack.Screen name="ManageCircle" component={ManageCircleScreen} />
         </>
       )}
     </Stack.Navigator>

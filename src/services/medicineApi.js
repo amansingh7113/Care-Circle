@@ -57,10 +57,28 @@ export const deleteMedicine = async (medicineId) => {
   return response.data;
 };
 
+export const archiveMedicine = async (medicineId) => {
+  const response = await medicineApi.patch(`/${medicineId}/archive`);
+  return response.data;
+};
+
+export const logVoiceMedicine = async (circleId, transcript) => {
+  const response = await medicineApi.post('/voice-log', { circle_id: circleId, transcript });
+  return response.data;
+};
+
+export const updateMedicine = async (medicineId, data) => {
+  const response = await medicineApi.patch(`/${medicineId}`, data);
+  return response.data;
+};
+
 export default {
   getMedicines,
   addMedicine,
   logAdministration,
   getMedicineAnalytics,
   deleteMedicine,
+  archiveMedicine,
+  logVoiceMedicine,
+  updateMedicine,
 };

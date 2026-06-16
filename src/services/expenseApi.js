@@ -38,7 +38,19 @@ export const addExpense = async (expenseData) => {
   return response.data;
 };
 
+export const deleteExpense = async (expenseId) => {
+  const response = await expenseApi.delete(`/${expenseId}`);
+  return response.data;
+};
+
+export const updateExpense = async (expenseId, expenseData) => {
+  const response = await expenseApi.patch(`/${expenseId}`, expenseData);
+  return response.data;
+};
+
 export default {
   getExpensesSummary,
   addExpense,
+  deleteExpense,
+  updateExpense,
 };

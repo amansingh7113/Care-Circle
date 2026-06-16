@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Modal, SafeAreaView, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Modal, SafeAreaView, Image, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import TextRecognition from '@react-native-ml-kit/text-recognition';
 import { logVitals } from '../../services/vitalsApi';
@@ -139,67 +139,72 @@ const LogBloodPressureModal = ({ visible, onClose }) => {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Log Blood Pressure</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>Close</Text>
-            </TouchableOpacity>
-          </View>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <SafeAreaView style={styles.safeArea}>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Log Blood Pressure</Text>
+              <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                <Text style={styles.closeText}>Close</Text>
+              </TouchableOpacity>
+            </View>
 
-          <View style={styles.content}>
-            <TouchableOpacity style={styles.scanButton} onPress={handleScanMonitor} disabled={isProcessing}>
-              <Text style={styles.scanButtonText}>📷 Scan Monitor Display</Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.orText}>- OR MANUAL ENTRY -</Text>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <TouchableOpacity style={styles.scanButton} onPress={handleScanMonitor} disabled={isProcessing}>
+                <Text style={styles.scanButtonText}>📷 Scan Monitor Display</Text>
+              </TouchableOpacity>
+              
+              <Text style={styles.orText}>- OR MANUAL ENTRY -</Text>
 
-            {imageUri && (
-                <Image source={{uri: imageUri}} style={styles.previewImage} resizeMode="contain" />
-            )}
+              {imageUri && (
+                  <Image source={{uri: imageUri}} style={styles.previewImage} resizeMode="contain" />
+              )}
 
-            <View style={styles.inputRow}>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Systolic (SYS)</Text>
+              <View style={styles.inputRow}>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Systolic (SYS)</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholder="120"
+                    value={systolic}
+                    onChangeText={setSystolic}
+                  />
+                </View>
+                <Text style={styles.slash}>/</Text>
+                <View style={styles.inputContainer}>
+                  <Text style={styles.label}>Diastolic (DIA)</Text>
+                  <TextInput
+                    style={styles.input}
+                    keyboardType="numeric"
+                    placeholder="80"
+                    value={diastolic}
+                    onChangeText={setDiastolic}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputContainerFull}>
+                <Text style={styles.label}>Pulse (Optional)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
-                  placeholder="120"
-                  value={systolic}
-                  onChangeText={setSystolic}
+                  placeholder="72"
+                  value={pulse}
+                  onChangeText={setPulse}
                 />
               </View>
-              <Text style={styles.slash}>/</Text>
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>Diastolic (DIA)</Text>
-                <TextInput
-                  style={styles.input}
-                  keyboardType="numeric"
-                  placeholder="80"
-                  value={diastolic}
-                  onChangeText={setDiastolic}
-                />
-              </View>
-            </View>
 
-            <View style={styles.inputContainerFull}>
-              <Text style={styles.label}>Pulse (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                keyboardType="numeric"
-                placeholder="72"
-                value={pulse}
-                onChangeText={setPulse}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isProcessing}>
-              {isProcessing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Save Log</Text>}
-            </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={isProcessing}>
+                {isProcessing ? <ActivityIndicator color="#FFF" /> : <Text style={styles.saveButtonText}>Save Log</Text>}
+              </TouchableOpacity>
+            </ScrollView>
           </View>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };

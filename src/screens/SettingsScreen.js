@@ -65,6 +65,18 @@ const SettingsScreen = ({ navigation }) => {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      if (clearSession) clearSession();
+      // Wait a tick for Zustand to clear state, which triggers RootNavigator to show Login/AuthStack
+      // Or we can manually reset
+      Alert.alert('Logged Out', 'You have been successfully logged out.');
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -153,6 +165,15 @@ const SettingsScreen = ({ navigation }) => {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Management</Text>
+          <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('EditProfile')}>
+            <Text style={styles.rowButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('ManageCircle')}>
+            <Text style={styles.rowButtonText}>Manage Circle</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rowButton} onPress={handleLogout}>
+            <Text style={styles.logoutButtonText}>Log Out</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={[styles.rowButton, styles.deleteButton]} onPress={() => setDeleteModalVisible(true)}>
             <Text style={styles.deleteButtonText}>Delete Account</Text>
           </TouchableOpacity>
@@ -216,6 +237,7 @@ const styles = StyleSheet.create({
   sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 12 },
   rowButton: { backgroundColor: THEME.colors.cardBg, padding: 16, borderRadius: THEME.borderRadius.card, marginBottom: 8, ...THEME.shadows.soft, borderWidth: 1, borderColor: THEME.colors.border },
   rowButtonText: { ...THEME.typography.body, fontWeight: '600' },
+  logoutButtonText: { ...THEME.typography.body, fontWeight: 'bold', color: THEME.colors.primary },
   deleteButton: { borderColor: THEME.colors.alert, borderWidth: 1, backgroundColor: '#FEF2F2' },
   deleteButtonText: { ...THEME.typography.body, color: THEME.colors.alert, fontWeight: 'bold' },
   

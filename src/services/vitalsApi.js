@@ -38,7 +38,19 @@ export const logVitals = async (data) => {
   return response.data;
 };
 
+export const updateVitals = async (id, data) => {
+  const response = await vitalsApi.put(`/${id}`, data);
+  return response.data;
+};
+
+export const deleteVitals = async (id) => {
+  const response = await vitalsApi.delete(`/${id}`);
+  return response.data;
+};
+
 export default {
   getVitals,
   logVitals,
+  updateVitals,
+  deleteVitals,
 };

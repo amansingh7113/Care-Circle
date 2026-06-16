@@ -57,6 +57,10 @@ router.post('/', async (req, res) => {
     const { circle_id, sleep_start, sleep_end, duration_minutes, is_auto_detected } = req.body;
     const patient_id = req.user.id;
 
+    if (!circle_id || !sleep_start || !sleep_end) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
     const { data, error } = await supabase
       .from('sleep_logs')
       .insert([{

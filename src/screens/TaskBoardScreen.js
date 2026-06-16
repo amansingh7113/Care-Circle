@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { getTasks, updateTaskStatus } from '../services/taskApi';
+import { getTasks, updateTaskStatus, deleteTask } from '../services/taskApi';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
 import { THEME } from '../styles/theme';
@@ -51,8 +51,37 @@ const TaskBoardScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleDeleteTask = (taskId) => {
+    Alert.alert(
+      'Delete Task',
+      'Are you sure you want to delete this task?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsLoading(true);
+              await deleteTask(taskId);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              fetchTasks();
+            } catch (error) {
+              console.log('Failed to delete task', error);
+              setIsLoading(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const renderTask = ({ item }) => (
-    <View style={styles.card}>
+    <TouchableOpacity 
+      style={styles.card}
+      onLongPress={() => handleDeleteTask(item.id)}
+      activeOpacity={0.8}
+    >
       <View style={styles.cardContent}>
         <View style={styles.cardInfo}>
           <Text style={styles.taskTitle}>{item.title}</Text>
@@ -64,6 +93,9 @@ const TaskBoardScreen = ({ route, navigation }) => {
           </View>
         </View>
         <View style={styles.actions}>
+          <TouchableOpacity onPress={() => navigation.navigate('CreateTask', { circleId, taskToEdit: item })} style={{marginRight: 12}}>
+            <Ionicons name="pencil" size={20} color={THEME.colors.textMuted} />
+          </TouchableOpacity>
           {activeTab === 'pending' ? (
              <TouchableOpacity style={styles.completionBadge} onPress={() => handleUpdateStatus(item.id, 'completed')}>
                <Ionicons name="checkmark" size={20} color={THEME.colors.primary} />
@@ -75,7 +107,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   // Grouping logic for UI
@@ -209,7 +241,7 @@ const styles = StyleSheet.create({
   },
   assigneeInitial: { fontSize: 10, fontWeight: '700', color: THEME.colors.secondary },
   taskDetails: { ...THEME.typography.body, color: THEME.colors.textMuted, fontSize: 12 },
-  actions: { marginLeft: 16 },
+  actions: { marginLeft: 16, flexDirection: 'row', alignItems: 'center' },
   completionBadge: { 
     width: 32, height: 32, borderRadius: 16,
     borderWidth: 2, borderColor: THEME.colors.primary,

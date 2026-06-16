@@ -6,6 +6,7 @@ import AuthNavigator from './src/navigation/AuthNavigator';
 import AppNavigator from './src/navigation/AppNavigator';
 import { useStore } from './src/store/useStore';
 import StepTrackerService from './src/components/StepTrackerService';
+import SleepTrackerService from './src/components/SleepTrackerService';
 
 export default function App() {
   const userSession = useStore((state) => state.userSession);
@@ -42,6 +43,7 @@ export default function App() {
       ) : (
         <>
           <StepTrackerService />
+          <SleepTrackerService />
           <AppNavigator />
         </>
       )}

@@ -12,19 +12,6 @@ function getSupabase() {
   return supabase;
 }
 
-// Helper function to check if a scheduled time has passed by a certain threshold (e.g., 1 hour)
-function isDoseMissed(scheduledTimeStr) {
-  const now = new Date();
-  const [hours, minutes] = scheduledTimeStr.split(':').map(Number);
-  
-  const scheduledTime = new Date();
-  scheduledTime.setHours(hours, minutes, 0, 0);
-
-  // Add 1 hour grace period
-  const gracePeriodEnd = new Date(scheduledTime.getTime() + 60 * 60 * 1000);
-  
-  return now > gracePeriodEnd;
-}
 
 async function checkMissedDoses() {
   console.log('[Cron] Checking for missed doses...', new Date().toISOString());
@@ -95,8 +82,9 @@ async function checkMissedDoses() {
         }
       }
 
-      // Filter expected doses that have passed their grace period
+      // Filter expected doses that have passed their grace period and were scheduled after creation
       const passedDoses = expectedDoseTimes.filter(dose => {
+        if (dose.dateObj < new Date(med.created_at)) return false;
         const gracePeriodEnd = new Date(dose.dateObj.getTime() + 60 * 60 * 1000);
         return now > gracePeriodEnd;
       });
@@ -124,7 +112,19 @@ async function checkMissedDoses() {
             scheduled_time: dose.timeStr,
             logged_by: null // System generated
           });
-          console.log(`[Cron] Flagging missed dose for Medicine: ${med.name} (Circle: ${med.circle_id}) at ${dose.timeStr} on ${dose.dateObj.toDateString()}`);
+          console.log(`[Cron] Flagging missed dose for Medicine: \${med.name} (Circle: \${med.circle_id}) at \${dose.timeStr} on \${dose.dateObj.toDateString()}`);
+          
+          // Insert urgent notification for caregivers
+          getSupabase().from('notifications').insert([{
+            circle_id: med.circle_id,
+            type: 'MISSED_DOSE_ALERT',
+            priority: 'urgent',
+            context: { medicine_name: med.name, scheduled_time: dose.timeStr },
+            title: 'Missed Dose Alert',
+            body: \`\${med.name} was missed at \${dose.timeStr}.\`
+          }]).then(({error}) => {
+             if (error) console.error('[Cron] Error inserting missed dose notification:', error);
+          });
         }
       }
     }
