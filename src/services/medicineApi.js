@@ -1,4 +1,5 @@
-import { createApiClient } from './apiConfig';
+import { createApiClient, API_BASE_URL } from './apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const medicineApi = createApiClient('/api/v1/medicines');
 
@@ -46,12 +47,22 @@ export const logVoiceMedicineAudio = async (circleId, audioUri) => {
     name: 'voice-log.m4a',
   });
   
-  const response = await medicineApi.post('/voice-log-audio', formData, {
+  const token = await AsyncStorage.getItem('userToken');
+  const response = await fetch(`${API_BASE_URL}/api/v1/medicines/voice-log-audio`, {
+    method: 'POST',
+    body: formData,
     headers: {
-      'Content-Type': 'multipart/form-data',
-    },
+      Authorization: `Bearer ${token}`
+    }
   });
-  return response.data;
+
+  if (!response.ok) {
+    let errData;
+    try { errData = await response.json(); } catch(e) {}
+    throw new Error(errData?.error || 'Failed to process voice log');
+  }
+  
+  return await response.json();
 };
 
 export const updateMedicine = async (medicineId, data) => {
