@@ -48,6 +48,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
       Alert.alert('Success', `Task marked as ${newStatus}`);
     } catch (error) {
       console.log('Failed to update task', error);
+      fetchTasks();
     }
   };
 
@@ -88,9 +89,9 @@ const TaskBoardScreen = ({ route, navigation }) => {
           <Text style={styles.taskTitle}>{item.title}</Text>
           <View style={styles.taskMetaRow}>
             <View style={styles.assigneeAvatar}>
-              <Text style={styles.assigneeInitial}>{item.assignee ? item.assignee.charAt(0) : 'U'}</Text>
+              <Text style={styles.assigneeInitial}>{item.assigned_to ? item.assigned_to.charAt(0).toUpperCase() : 'U'}</Text>
             </View>
-            <Text style={styles.taskDetails}>Due: {item.dueDate} - {item.assignee}</Text>
+            <Text style={styles.taskDetails}>Due: {item.due_date || 'N/A'} - {item.assigned_to || 'Unassigned'}</Text>
           </View>
         </View>
         <View style={styles.actions}>
@@ -114,8 +115,8 @@ const TaskBoardScreen = ({ route, navigation }) => {
   // Grouping logic for UI
   const groupedTasks = tasks.reduce((acc, task) => {
     let group = 'TODAY';
-    if (task.dueDate && task.dueDate.toLowerCase().includes('tomorrow')) group = 'TOMORROW';
-    else if (task.dueDate && task.dueDate.toLowerCase().includes('yesterday')) group = 'PREVIOUS';
+    if (task.due_date && task.due_date.toLowerCase().includes('tomorrow')) group = 'TOMORROW';
+    else if (task.due_date && task.due_date.toLowerCase().includes('yesterday')) group = 'PREVIOUS';
     if (!acc[group]) acc[group] = [];
     acc[group].push(task);
     return acc;

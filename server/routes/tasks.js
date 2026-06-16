@@ -8,30 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
-// Authentication Middleware
-const authenticate = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, phone_number, role, circle_id }
-    
-    // Fetch latest circle_id from DB to prevent stale token 403s
-    const { data: dbUser } = await supabase.from('users').select('circle_id').eq('id', req.user.id).single();
-    if (dbUser && dbUser.circle_id) {
-      req.user.circle_id = dbUser.circle_id;
-    }
-
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
+const authenticate = require('../middleware/authenticate');
 router.use(authenticate);
 
 // 1. POST /api/v1/tasks
@@ -218,7 +195,53 @@ router.post('/:id/comments', async (req, res) => {
   }
 });
 
-// 5. DELETE /api/v1/tasks/:id
+// 5. GET /api/v1/tasks/:id/comments
+router.get('/:id/comments', async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const userCircleId = req.user.circle_id;
+
+    // Verify task belongs to user's circle
+    const { data: task, error: taskError } = await supabase
+      .from('tasks')
+      .select('circle_id')
+      .eq('id', taskId)
+      .single();
+
+    if (taskError || !task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    if (String(task.circle_id) !== String(userCircleId)) {
+      return res.status(403).json({ error: 'Unauthorized access to this task' });
+    }
+
+    const { data: comments, error } = await supabase
+      .from('task_comments')
+      .select('*, users:user_id(id, name)')
+      .eq('task_id', taskId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Get task comments error:', error);
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Flatten user data for the client
+    const formattedComments = (comments || []).map(c => ({
+      ...c,
+      user: c.users || { name: 'Unknown' },
+    }));
+    delete formattedComments.users;
+
+    res.status(200).json(formattedComments);
+  } catch (err) {
+    console.error('Get task comments catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 6. DELETE /api/v1/tasks/:id
 router.delete('/:id', async (req, res) => {
   try {
     const taskId = req.params.id;

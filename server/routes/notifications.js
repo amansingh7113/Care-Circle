@@ -8,30 +8,9 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
-const authenticateToken = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
+const authenticate = require('../middleware/authenticate');
 
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, phone_number, role, circle_id }
-    
-    // Fetch latest circle_id from DB to prevent stale token 403s
-    const { data: dbUser } = await supabaseAdmin.from('users').select('circle_id').eq('id', req.user.id).single();
-    if (dbUser && dbUser.circle_id) {
-      req.user.circle_id = dbUser.circle_id;
-    }
-
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
-router.use(authenticateToken);
+router.use(authenticate);
 
 // Middleware to ensure user's circle_id is available
 const ensureCircleId = async (req, res, next) => {

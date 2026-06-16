@@ -23,7 +23,7 @@ const CreateTaskScreen = ({ route, navigation }) => {
     }
 
     try {
-      const payload = { title, description, category, due_date: dueDate, assigned_to: assignee, status: taskToEdit?.status || 'pending' };
+      const payload = { title, description, category: category || 'General', due_date: dueDate, assigned_to: assignee, status: taskToEdit?.status || 'pending' };
       if (isEditing) {
         await updateTask(taskToEdit.id, payload);
         Alert.alert('Success', 'Task updated successfully');

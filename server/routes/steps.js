@@ -8,28 +8,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
-// Authentication Middleware
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
+const authenticate = require('../middleware/authenticate');
 router.use(authenticate);
 
 // 1. Fetch step logs for a circle
 router.get('/:circleId', async (req, res) => {
   const { circleId } = req.params;
+  const requestedLimit = parseInt(req.query.limit, 10);
+  const limit = (requestedLimit > 0 && requestedLimit <= 90) ? requestedLimit : 7;
 
   try {
     const { data: logs, error } = await supabase
@@ -37,7 +23,7 @@ router.get('/:circleId', async (req, res) => {
       .select('*')
       .eq('circle_id', circleId)
       .order('date', { ascending: false })
-      .limit(7);
+      .limit(limit);
 
     if (error) {
       console.error('Fetch step logs error:', error);

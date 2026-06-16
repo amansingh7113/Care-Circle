@@ -15,7 +15,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { getExpensesSummary, addExpense, deleteExpense, updateExpense, updateBudget } from '../../services/expenseApi';
-import useStore from '../../store/useStore';
+import { useStore } from '../../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 
 const ExpensesScreen = () => {
@@ -28,7 +28,8 @@ const ExpensesScreen = () => {
   const [category, setCategory] = useState('Medical');
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
   const [newBudgetAmount, setNewBudgetAmount] = useState('');
-  const circleId = useStore(state => state.currentCircleId);
+  const { currentCircle, user } = useStore();
+  const circleId = currentCircle?.id || user?.circle_id;
 
   useEffect(() => {
     fetchExpensesSummary();

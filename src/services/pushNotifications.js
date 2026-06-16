@@ -1,16 +1,30 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { savePushToken } from './notificationApi';
+import Constants from 'expo-constants';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+let Notifications = null;
+
+if (Constants.appOwnership !== 'expo') {
+  try {
+    Notifications = require('expo-notifications');
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+  } catch (error) {
+    console.warn('Notifications not supported in this environment:', error.message);
+  }
+}
 
 export async function registerForPushNotifications() {
+  if (!Notifications) {
+    console.warn('Push notifications are skipped in Expo Go.');
+    return null;
+  }
+
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
@@ -49,21 +63,28 @@ export async function registerForPushNotifications() {
 }
 
 export function setupNotificationListeners(navigationRef) {
-  // Handle notification when app is foregrounded
-  const foregroundSub = Notifications.addNotificationReceivedListener((notification) => {
-    console.log('Foreground notification:', notification);
-  });
+  if (!Notifications) return () => {};
 
-  // Handle notification tap
-  const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
-    const data = response.notification.request.content.data;
-    if (data?.type === 'MISSED_DOSE_ALERT' && navigationRef?.isReady()) {
-      navigationRef.navigate('MedicineTracker');
-    }
-  });
+  try {
+    // Handle notification when app is foregrounded
+    const foregroundSub = Notifications.addNotificationReceivedListener((notification) => {
+      console.log('Foreground notification:', notification);
+    });
 
-  return () => {
-    foregroundSub.remove();
-    responseSub.remove();
-  };
+    // Handle notification tap
+    const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      if (data?.type === 'MISSED_DOSE_ALERT' && navigationRef?.isReady()) {
+        navigationRef.navigate('MedicineTracker');
+      }
+    });
+
+    return () => {
+      foregroundSub.remove();
+      responseSub.remove();
+    };
+  } catch (error) {
+    console.warn('Notification listeners error:', error.message);
+    return () => {};
+  }
 }

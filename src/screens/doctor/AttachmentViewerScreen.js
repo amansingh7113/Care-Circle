@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Image, ActivityIndicator, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Sparkles } from 'lucide-react-native';
 import { THEME } from '../../styles/theme';

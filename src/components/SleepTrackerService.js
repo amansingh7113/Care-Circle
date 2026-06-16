@@ -84,12 +84,16 @@ export default function SleepTrackerService() {
 
   const logSleep = async (durationMinutes) => {
     if (!currentCircle) return;
-    const today = new Date().toISOString().split('T')[0];
     try {
+      const sleepEnd = new Date().toISOString();
+      const sleepStart = new Date(Date.now() - durationMinutes * 60000).toISOString();
+      
       await addSleepLog({
         circle_id: currentCircle.id,
-        date: today,
+        sleep_start: sleepStart,
+        sleep_end: sleepEnd,
         duration_minutes: Math.round(durationMinutes),
+        is_auto_detected: true
       });
       console.log(`Synced ${durationMinutes} mins of sleep`);
     } catch (error) {

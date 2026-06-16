@@ -12,30 +12,7 @@ const supabase = createClient(
 // Initialize Gemini Client
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'dummy_key_if_not_set' });
 
-// Authentication Middleware
-const authenticate = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, phone_number, role, circle_id }
-    
-    // Fetch latest circle_id from DB to prevent stale token 403s
-    const { data: dbUser } = await supabase.from('users').select('circle_id').eq('id', req.user.id).single();
-    if (dbUser && dbUser.circle_id) {
-      req.user.circle_id = dbUser.circle_id;
-    }
-
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
+const authenticate = require('../middleware/authenticate');
 router.use(authenticate);
 
 router.post('/generate-manual', async (req, res) => {

@@ -5,6 +5,7 @@ validateEnv();
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -20,8 +21,12 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 // Create a single supabase client for interacting with your database
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+const authenticate = require('./middleware/authenticate');
+
+// Mount Routes
 const authRouter = require('./routes/auth');
 const circlesRouter = require('./routes/circles');
+const usersRouter = require('./routes/users');
 const medicinesRouter = require('./routes/medicines');
 const tasksRouter = require('./routes/tasks');
 const doctorVisitsRouter = require('./routes/doctorVisits');
@@ -34,6 +39,7 @@ const insightsRouter = require('./routes/insights');
 const notificationsRouter = require('./routes/notifications');
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/circles', circlesRouter);
+app.use('/api/v1/users', usersRouter);
 app.use('/api/v1/medicines', medicinesRouter);
 app.use('/api/v1/tasks', tasksRouter);
 app.use('/api/v1/doctor-visits', doctorVisitsRouter);
@@ -44,22 +50,8 @@ app.use('/api/v1/steps', stepsRouter);
 app.use('/api/v1/documents', documentsRouter);
 app.use('/api/v1/insights', insightsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
-const authenticate = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  const token = authHeader.split(' ')[1];
-  try {
-    const jwt = require('jsonwebtoken');
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    const { data: dbUser } = await supabase.from('users').select('circle_id').eq('id', req.user.id).single();
-    if (dbUser && dbUser.circle_id) req.user.circle_id = dbUser.circle_id;
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
 
-app.get('/dashboard', authenticate, async (req, res) => {
+app.get('/api/v1/dashboard', authenticate, async (req, res) => {
   try {
     const circle_id = req.query.circle_id || req.user.circle_id;
     if (!circle_id) return res.status(403).json({ error: 'No circle_id provided' });
@@ -69,7 +61,7 @@ app.get('/dashboard', authenticate, async (req, res) => {
       supabase.from('sleep_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('step_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('medicines').select('*').eq('circle_id', circle_id).eq('is_archived', false),
-      supabase.from('tasks').select('*').eq('circle_id', circle_id).eq('status', 'pending')
+      supabase.from('tasks').select('*').eq('circle_id', circle_id)
     ]);
 
     res.status(200).json({

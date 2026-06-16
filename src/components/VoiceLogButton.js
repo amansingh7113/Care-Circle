@@ -81,12 +81,13 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
     setIsProcessing(true);
     try {
       const response = await logVoiceMedicine(circleId, transcriptText.trim());
-      setResults(response.data || response);
+      setResults(response);
       setShowResults(true);
       setTranscriptText('');
       if (onSuccess) onSuccess();
     } catch (err) {
-      setError(err.message || 'Failed to process voice log');
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to process voice log';
+      setError(errorMsg);
     } finally {
       setIsProcessing(false);
     }
@@ -170,26 +171,21 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
                 <X size={22} color={THEME.colors.textMuted} />
               </TouchableOpacity>
             </View>
-            {results?.results && (
-              <FlatList
-                data={results.results}
-                keyExtractor={(_, i) => i.toString()}
-                renderItem={({ item }) => (
-                  <View style={styles.resultItem}>
-                    <View style={[styles.resultIcon, { backgroundColor: item.status === 'logged' ? THEME.colors.success + '20' : THEME.colors.alert + '20' }]}>
-                      {item.status === 'logged' ? <Check size={16} color={THEME.colors.success} /> : <AlertCircle size={16} color={THEME.colors.alert} />}
-                    </View>
-                    <View style={styles.resultContent}>
-                      <Text style={styles.resultMedicine}>{item.medicine}</Text>
-                      <Text style={styles.resultMessage}>{item.message}</Text>
-                    </View>
-                  </View>
-                )}
-                style={{ maxHeight: 300 }}
-              />
+            {results?.message && (
+              <View style={styles.resultItem}>
+                <View style={[styles.resultIcon, { backgroundColor: (THEME.colors.success || '#34C759') + '20' }]}>
+                  <Check size={16} color={THEME.colors.success || '#34C759'} />
+                </View>
+                <View style={styles.resultContent}>
+                  <Text style={styles.resultMedicine}>{results.message}</Text>
+                </View>
+              </View>
             )}
-            {results?.processedCount !== undefined && (
-              <Text style={styles.processedCount}>{results.processedCount} medicine(s) processed</Text>
+            {results?.logged && results.logged.length > 0 && (
+              <Text style={styles.processedCount}>{results.logged.length} medicine(s) logged successfully</Text>
+            )}
+            {results?.logged && results.logged.length === 0 && (
+              <Text style={styles.processedCount}>No medicines were matched</Text>
             )}
           </View>
         </View>

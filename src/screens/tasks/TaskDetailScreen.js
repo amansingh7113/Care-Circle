@@ -62,7 +62,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
     setComments(prev => [...prev, tempComment]);
     
     try {
-      await addTaskComment(task.id, { text: commentText, user_id: user?.id });
+      await addTaskComment(task.id, commentText);
       // Refresh to get actual data
       fetchComments();
     } catch (error) {
@@ -99,7 +99,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
         )}
         <View style={[styles.commentBubble, isMe && styles.myCommentBubble]}>
           <Text style={[styles.commentName, isMe && styles.myCommentName]}>{isMe ? 'Me' : name}</Text>
-          <Text style={[styles.commentText, isMe && styles.myCommentText]}>{item.text}</Text>
+          <Text style={[styles.commentText, isMe && styles.myCommentText]}>{item.comment || item.text}</Text>
           <Text style={[styles.commentTime, isMe && styles.myCommentTime]}>
             {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
           </Text>
@@ -147,11 +147,11 @@ const TaskDetailScreen = ({ route, navigation }) => {
           <View style={styles.metaContainer}>
             <View style={styles.metaItem}>
               <Calendar size={16} color={THEME.colors.textMuted} />
-              <Text style={styles.metaText}>{task.dueDate || 'No due date'}</Text>
+              <Text style={styles.metaText}>{task.due_date || task.dueDate || 'No due date'}</Text>
             </View>
             <View style={styles.metaItem}>
               <User size={16} color={THEME.colors.textMuted} />
-              <Text style={styles.metaText}>{task.assignee || 'Unassigned'}</Text>
+              <Text style={styles.metaText}>{task.assigned_to || task.assignee || 'Unassigned'}</Text>
             </View>
             {task.category && (
               <View style={styles.metaItem}>

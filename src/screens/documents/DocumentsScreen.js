@@ -99,9 +99,10 @@ const DocumentsScreen = ({ navigation }) => {
       
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random()}.${fileExt}`;
+      const contentType = file.mimeType || 'application/octet-stream';
 
       // Get signed upload URL from backend
-      const { signedUrl, filePath } = await getUploadUrl(fileName);
+      const { signedUrl, filePath } = await getUploadUrl(fileName, contentType);
 
       const response = await fetch(file.uri);
       const arrayBuffer = await response.arrayBuffer();

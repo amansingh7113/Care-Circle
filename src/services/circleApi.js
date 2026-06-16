@@ -1,34 +1,6 @@
-import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { createApiClient } from './apiConfig';
 
-import { API_BASE_URL } from './apiConfig';
-const API_URL = `${API_BASE_URL}/api/v1/circles`;
-
-const circleApi = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Bypass-Tunnel-Reminder': 'true',
-  },
-});
-
-// Request interceptor to add the JWT token
-circleApi.interceptors.request.use(
-  async (config) => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    } catch (error) {
-      console.error('Error fetching token from storage', error);
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+const circleApi = createApiClient('/api/v1/circles');
 
 export const getUserCircles = async () => {
   const response = await circleApi.get('/');

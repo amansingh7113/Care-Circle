@@ -9,30 +9,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
-// Authentication Middleware
-const authenticate = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, phone_number, role, circle_id }
-    
-    // Fetch latest circle_id from DB to prevent stale token 403s
-    const { data: dbUser } = await supabase.from('users').select('circle_id').eq('id', req.user.id).single();
-    if (dbUser && dbUser.circle_id) {
-      req.user.circle_id = dbUser.circle_id;
-    }
-
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
+const authenticate = require('../middleware/authenticate');
 router.use(authenticate);
 
 // 1. POST /api/v1/medicines
@@ -62,7 +39,7 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'days must be an array of strings' });
   }
 
-  const instructions = { frequency, scheduled_times: scheduled_times || [], days: days || [] };
+  const instructions = JSON.stringify({ frequency, scheduled_times: scheduled_times || [], days: days || [] });
 
   const { data, error } = await supabase
     .from('medicines')
@@ -421,7 +398,7 @@ router.post('/voice-log', async (req, res) => {
     Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.`;
     
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-1.5-flash',
         contents: prompt
     });
     
@@ -588,12 +565,12 @@ router.patch('/:id', async (req, res) => {
         currentInstructions = typeof med.instructions === 'string' ? JSON.parse(med.instructions) : med.instructions;
       } catch (e) {}
 
-      updates.instructions = {
+      updates.instructions = JSON.stringify({
         ...currentInstructions,
         ...(frequency !== undefined && { frequency }),
         ...(scheduled_times !== undefined && { scheduled_times }),
         ...(days !== undefined && { days })
-      };
+      });
     }
 
     const { data, error } = await supabase

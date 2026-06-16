@@ -8,23 +8,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
-// Authentication Middleware
-const authenticate = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
-  }
-
-  const token = authHeader.split(' ')[1];
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // { id, phone_number, role, circle_id }
-    next();
-  } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
-  }
-};
-
+const authenticate = require('../middleware/authenticate');
 router.use(authenticate);
 
 // 0. Fetch user circles
@@ -231,6 +215,35 @@ router.post('/join', async (req, res) => {
   } catch (err) {
     console.error('Join circle catch error:', err);
     return res.status(400).json({ error: 'Invalid or expired invite code' });
+  }
+});
+
+// 5. Remove member from circle
+router.delete('/:id/members/:memberId', async (req, res) => {
+  const { id, memberId } = req.params;
+  const userCircleId = req.user.circle_id;
+  const userRole = req.user.role; // Assuming role is available
+
+  if (String(id) !== String(userCircleId)) {
+    return res.status(403).json({ error: 'Unauthorized access to this circle' });
+  }
+
+  try {
+    const { error } = await supabase
+      .from('users')
+      .update({ circle_id: null })
+      .eq('id', memberId)
+      .eq('circle_id', id); // ensure they are actually in this circle
+
+    if (error) {
+      console.error('Remove member error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    res.status(200).json({ message: 'Member removed successfully' });
+  } catch (err) {
+    console.error('Remove member catch error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

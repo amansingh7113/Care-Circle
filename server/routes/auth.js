@@ -66,15 +66,15 @@ router.post('/verify-otp', async (req, res) => {
     const profile = userProfile || { 
       id: authData.user.id, 
       phone_number: authData.user.phone, 
-      profile_role: 'User', 
+      role: 'User', 
       circle_id: null 
     };
 
     // Sign a local JWT
     const jwtPayload = {
       id: profile.id,
-      phone_number: profile.phone_number,
-      role: profile.profile_role,
+      phone_number: profile.phone_number || profile.phone,
+      role: profile.role,
       circle_id: profile.circle_id
     };
 
@@ -142,15 +142,15 @@ router.post('/exchange-session', async (req, res) => {
     const profile = userProfile || { 
       id: user.id, 
       phone_number: user.phone, 
-      profile_role: 'User', 
+      role: 'User', 
       circle_id: null 
     };
 
     // Sign a local JWT
     const jwtPayload = {
       id: profile.id,
-      phone_number: profile.phone_number,
-      role: profile.profile_role,
+      phone_number: profile.phone_number || profile.phone,
+      role: profile.role,
       circle_id: profile.circle_id
     };
 
@@ -239,20 +239,23 @@ router.post('/register-email', async (req, res) => {
       // Provision user
       profile = {
         id: authData.user.id,
-        phone_number: null,
-        profile_role: 'User',
+        name: email.split('@')[0], // Give a default name
+        role: 'User',
         circle_id: null
       };
       
-      // Attempt to insert if DB triggers don't handle it
-      await supabase.from('users').insert(profile).select().single();
+      // We cannot insert a user without a circle_id if circle_id is NOT NULL in schema
+      // but if we do, we need to handle it.
+      // Wait, circle_id is UUID NOT NULL in schema! 
+      // This means inserting a user without a circle_id will fail.
+      // We should NOT insert into users table here until they join a circle!
     }
 
     // Sign a local JWT
     const jwtPayload = {
       id: profile.id,
-      phone_number: profile.phone_number,
-      role: profile.profile_role,
+      phone_number: profile.phone || profile.phone_number,
+      role: profile.role,
       circle_id: profile.circle_id
     };
 
@@ -302,15 +305,15 @@ router.post('/login-email', async (req, res) => {
     const profile = userProfile || { 
       id: authData.user.id, 
       phone_number: null, 
-      profile_role: 'User', 
+      role: 'User', 
       circle_id: null 
     };
 
     // Sign a local JWT
     const jwtPayload = {
       id: profile.id,
-      phone_number: profile.phone_number,
-      role: profile.profile_role,
+      phone_number: profile.phone_number || profile.phone,
+      role: profile.role,
       circle_id: profile.circle_id
     };
 

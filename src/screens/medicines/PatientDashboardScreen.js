@@ -39,7 +39,12 @@ const PatientDashboardScreen = ({ navigation }) => {
   const handleLogAction = async (medicine, status) => {
     try {
       setLoggingId(medicine.id);
-      const scheduledTime = medicine.instructions?.scheduled_times ? medicine.instructions.scheduled_times[0] : null;
+      let instructions = {};
+      try {
+        instructions = typeof medicine.instructions === 'string' ? JSON.parse(medicine.instructions) : (medicine.instructions || {});
+        if (typeof instructions === 'string') instructions = JSON.parse(instructions);
+      } catch(e) {}
+      const scheduledTime = medicine.scheduled_time || (instructions.scheduled_times ? instructions.scheduled_times[0] : null);
       await logAdministration(medicine.id, status, scheduledTime);
       
       Alert.alert('Success', `Medicine marked as ${status}`);
@@ -53,7 +58,12 @@ const PatientDashboardScreen = ({ navigation }) => {
   };
 
   const renderItem = ({ item }) => {
-    const scheduledTime = item.instructions?.scheduled_times ? item.instructions.scheduled_times.join(', ') : 'As needed';
+    let instructions = {};
+    try {
+      instructions = typeof item.instructions === 'string' ? JSON.parse(item.instructions) : (item.instructions || {});
+      if (typeof instructions === 'string') instructions = JSON.parse(instructions);
+    } catch(e) {}
+    const scheduledTime = item.scheduled_time || (instructions.scheduled_times ? instructions.scheduled_times.join(', ') : 'As needed');
     
     return (
       <View style={styles.card}>
@@ -109,9 +119,9 @@ const PatientDashboardScreen = ({ navigation }) => {
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               <EmptyState 
-                icon="medkit" 
-                title="All caught up!" 
-                message="You have no pending medicines at the moment." 
+                iconName="medkit" 
+                titleText="All caught up!" 
+                subtitleText="You have no pending medicines at the moment." 
               />
             }
           />

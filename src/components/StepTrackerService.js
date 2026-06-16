@@ -9,8 +9,8 @@ export default function StepTrackerService() {
   const user = useStore(state => state.user);
   
   const subscriptionRef = useRef(null);
-  const lastSyncTimeRef = useRef(Date.now());
   const currentStepsRef = useRef(0);
+  const baseStepsRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,11 +25,22 @@ export default function StepTrackerService() {
         const isAvailable = await Pedometer.isAvailableAsync();
         if (!isAvailable || !isMounted) return;
 
-        // Since Pedometer.watchStepCount only tracks steps since subscription, 
-        // we start counting from 0 for this session. In a real production app, 
-        // you would want to use Pedometer.getStepCountAsync to get the absolute daily steps.
+        const end = new Date();
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        
+        try {
+          const pastSteps = await Pedometer.getStepCountAsync(start, end);
+          if (pastSteps) {
+            baseStepsRef.current = pastSteps.steps;
+            currentStepsRef.current = pastSteps.steps;
+          }
+        } catch (e) {
+          console.warn("Could not get past steps, starting from 0:", e);
+        }
+
         subscriptionRef.current = Pedometer.watchStepCount(result => {
-          currentStepsRef.current = result.steps;
+          currentStepsRef.current = baseStepsRef.current + result.steps;
         });
 
       } catch (error) {
@@ -46,7 +57,7 @@ export default function StepTrackerService() {
         subscriptionRef.current = null;
       }
     };
-  }, []);
+  }, [user?.role]);
 
   // Sync to backend periodically or on app backgrounding
   useEffect(() => {

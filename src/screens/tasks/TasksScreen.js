@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
-import { supabase } from '../../services/supabase';
+import React, { useState, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, RefreshControl } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
+import { getTasks, updateTaskStatus } from '../../services/taskApi';
 import { useStore } from '../../store/useStore';
 
-const STATUS_TABS = ['Todo', 'In Progress', 'Completed'];
+const STATUS_TABS = ['pending', 'completed'];
+
+const STATUS_LABELS = {
+  pending: 'Pending',
+  completed: 'Completed',
+};
 
 const getPriorityColor = (priority) => {
   switch (priority?.toLowerCase()) {
@@ -16,9 +22,7 @@ const getPriorityColor = (priority) => {
 
 const TaskCard = ({ task, onStatusChange }) => {
   const getNextStatus = (current) => {
-    if (current === 'Todo') return 'In Progress';
-    if (current === 'In Progress') return 'Completed';
-    return 'Todo';
+    return current === 'pending' ? 'completed' : 'pending';
   };
 
   return (
@@ -26,18 +30,19 @@ const TaskCard = ({ task, onStatusChange }) => {
       <View style={styles.cardHeader}>
         <Text style={styles.cardTitle}>{task.title}</Text>
         <View style={[styles.priorityPill, { backgroundColor: getPriorityColor(task.priority) }]}>
-          <Text style={styles.priorityText}>{task.priority || 'Low'}</Text>
+          <Text style={styles.priorityText}>{task.category || 'General'}</Text>
         </View>
       </View>
       <Text style={styles.cardDescription}>{task.description}</Text>
+      {task.due_date && <Text style={styles.dueDate}>Due: {task.due_date}</Text>}
       
       <TouchableOpacity 
         style={styles.actionButton}
         onPress={() => onStatusChange(task.id, getNextStatus(task.status))}
         accessibilityRole="button"
-        accessibilityLabel={`Move task to ${getNextStatus(task.status)}`}
+        accessibilityLabel={`Move task to ${STATUS_LABELS[getNextStatus(task.status)]}`}
       >
-        <Text style={styles.actionText}>Move to {getNextStatus(task.status)}</Text>
+        <Text style={styles.actionText}>Mark as {STATUS_LABELS[getNextStatus(task.status)]}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -46,56 +51,43 @@ const TaskCard = ({ task, onStatusChange }) => {
 const TasksScreen = () => {
   const currentCircle = useStore((state) => state.currentCircle);
   const [tasks, setTasks] = useState([]);
-  const [activeTab, setActiveTab] = useState('Todo');
+  const [activeTab, setActiveTab] = useState('pending');
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
+  const fetchTasks = useCallback(async () => {
     if (!currentCircle?.id) return;
+    try {
+      const data = await getTasks(currentCircle.id, activeTab);
+      setTasks(Array.isArray(data) ? data : (data?.tasks || []));
+    } catch (error) {
+      console.log('Failed to fetch tasks', error);
+      setTasks([]);
+    }
+  }, [currentCircle?.id, activeTab]);
 
-    const fetchTasks = async () => {
-      const { data, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('circle_id', currentCircle.id);
-      
-      if (!error && data) {
-        setTasks(data);
-      }
-    };
-
-    fetchTasks();
-
-    const subscription = supabase
-      .channel('public:tasks')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'tasks',
-        filter: `circle_id=eq.${currentCircle.id}`
-      }, (payload) => {
-        if (payload.eventType === 'INSERT') {
-          setTasks(prev => [...prev, payload.new]);
-        } else if (payload.eventType === 'UPDATE') {
-          setTasks(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
-        } else if (payload.eventType === 'DELETE') {
-          setTasks(prev => prev.filter(t => t.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [currentCircle]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchTasks();
+    }, [fetchTasks])
+  );
 
   const handleStatusChange = async (taskId, newStatus) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-    await supabase
-      .from('tasks')
-      .update({ status: newStatus })
-      .eq('id', taskId);
+    // Optimistic update: remove from current filtered list
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+    try {
+      await updateTaskStatus(taskId, { status: newStatus });
+    } catch (error) {
+      console.log('Failed to update task status', error);
+      // Refetch on failure to restore correct state
+      fetchTasks();
+    }
   };
 
-  const filteredTasks = tasks.filter(task => task.status === activeTab);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchTasks();
+    setRefreshing(false);
+  };
 
   return (
     <View style={styles.container}>
@@ -107,19 +99,20 @@ const TasksScreen = () => {
             onPress={() => setActiveTab(tab)}
             accessibilityRole="tab"
           >
-            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{tab}</Text>
+            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>{STATUS_LABELS[tab]}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
       <FlatList
-        data={filteredTasks}
+        data={tasks}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
           <TaskCard task={item} onStatusChange={handleStatusChange} />
         )}
         contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={<Text style={styles.emptyText}>No tasks in {activeTab}</Text>}
+        ListEmptyComponent={<Text style={styles.emptyText}>No {STATUS_LABELS[activeTab].toLowerCase()} tasks</Text>}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
     </View>
   );

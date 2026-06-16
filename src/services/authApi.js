@@ -1,16 +1,6 @@
-import axios from 'axios';
-import { Platform } from 'react-native';
+import { createApiClient } from './apiConfig';
 
-import { API_BASE_URL } from './apiConfig';
-
-const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1/auth`,
-  timeout: 60000, // Increased to 60s to survive Render cold starts
-  headers: {
-    'Content-Type': 'application/json',
-    'Bypass-Tunnel-Reminder': 'true',
-  },
-});
+const apiClient = createApiClient('/api/v1/auth', { timeout: 60000 });
 
 export const sendOtp = async (phone) => {
   const response = await apiClient.post('/send-otp', { phone_number: phone });

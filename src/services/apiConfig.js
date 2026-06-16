@@ -9,7 +9,10 @@ export function createApiClient(basePath = '', options = {}) {
   const client = axios.create({
     baseURL: `${API_BASE_URL}${basePath}`,
     timeout,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+      'Content-Type': 'application/json',
+      'Bypass-Tunnel-Reminder': 'true'
+    },
   });
 
   // Request interceptor: attach JWT token

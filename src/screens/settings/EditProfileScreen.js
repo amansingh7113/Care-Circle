@@ -1,16 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';
-import { supabase } from '../../services/supabase';
+import { createApiClient } from '../../services/apiConfig';
 
 const EditProfileScreen = ({ navigation }) => {
-  const { user, setSession } = useStore();
-  
-  const [name, setName] = useState(user?.name || '');
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+
+  const apiClient = createApiClient('/api/v1/users');
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      setIsFetching(true);
+      const response = await apiClient.get('/profile');
+      if (response.data && response.data.user) {
+        setName(response.data.user.name || '');
+        setPhone(response.data.user.phone || '');
+        setEmail(response.data.user.email || 'N/A');
+      }
+    } catch (error) {
+      console.error('Fetch profile error:', error);
+      Alert.alert('Error', 'Failed to load profile');
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -20,28 +42,28 @@ const EditProfileScreen = ({ navigation }) => {
 
     try {
       setIsLoading(true);
-      // Example implementation updating supabase auth user
-      // In MVP we might just update the users table in supabase
-      const { data, error } = await supabase
-        .from('users')
-        .update({ name: name, phone: phone })
-        .eq('id', user.id);
-
-      if (error) throw error;
       
-      // Update local store - user object needs fresh fetch or optimistic update
-      // Since `user` is derived from JWT, ideally we refresh token, but for now:
+      await apiClient.put('/profile', { name, phone });
+
       Alert.alert('Success', 'Profile updated successfully', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
       
     } catch (error) {
-      console.error(error);
+      console.error('Update profile error:', error);
       Alert.alert('Error', 'Failed to update profile');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (isFetching) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={THEME.colors.primary} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -80,7 +102,7 @@ const EditProfileScreen = ({ navigation }) => {
             <Text style={styles.label}>Email Address</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
-              value={user?.email || 'N/A'}
+              value={email}
               editable={false}
             />
             <Text style={styles.hintText}>Email cannot be changed</Text>

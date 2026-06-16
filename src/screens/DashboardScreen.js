@@ -15,10 +15,10 @@ import CircularProgressRing from '../components/CircularProgressRing';
 import { useStore } from '../store/useStore';
 
 const vitalsConfig = [
-  { id: '1', label: 'Blood Pressure', value: '120/80', icon: '❤️', color: THEME.colors.alert },
-  { id: '2', label: 'Medication', value: 'In 30 Mins', icon: 'Pill', color: THEME.colors.primary, subLabel: 'Aspirin • 81mg', upcoming: true },
-  { id: '3', label: 'Daily Steps', value: '0', icon: '👣', color: '#3BA0E3' }, // custom blue
-  { id: '4', label: 'Sleep', value: '7h 20m', icon: '🌙', color: '#FCD34D' }, // custom yellow
+  { id: '1', label: 'Blood Pressure', value: '--/--', icon: '❤️', color: THEME.colors.alert },
+  { id: '2', label: 'Medication', value: '--', icon: 'Pill', color: THEME.colors.primary, subLabel: 'No meds', upcoming: false },
+  { id: '3', label: 'Daily Steps', value: '0', icon: '👣', color: '#3BA0E3' },
+  { id: '4', label: 'Sleep', value: '--h --m', icon: '🌙', color: '#FCD34D' },
 ];
 
 const DashboardScreen = ({ route, navigation }) => {
@@ -159,6 +159,11 @@ const DashboardScreen = ({ route, navigation }) => {
   const pendingMeds = (medicines || []).filter(m => m.status !== 'taken');
   const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
 
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const taskProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const pendingTasks = tasks.filter(t => t.status === 'pending');
+
   const handleLogNextMed = async () => {
     if (!nextMed) return;
     
@@ -219,9 +224,9 @@ const DashboardScreen = ({ route, navigation }) => {
         {/* Module: Daily Progress Hero Card */}
         <View style={styles.progressSection}>
           <View style={styles.progressCard}>
-            <CircularProgressRing progress={75} size={110} strokeWidth={14} color={THEME.colors.primary} />
+            <CircularProgressRing progress={taskProgress} size={110} strokeWidth={14} color={THEME.colors.primary} />
             <View style={styles.progressInfo}>
-              <Text style={styles.progressValue}>75%</Text>
+              <Text style={styles.progressValue}>{taskProgress}%</Text>
               <Text style={styles.progressLabel}>TASKS COMPLETED</Text>
             </View>
           </View>
@@ -332,13 +337,13 @@ const DashboardScreen = ({ route, navigation }) => {
         <View style={styles.activitySection}>
           <Text style={styles.sectionTitle}>Task Feed</Text>
           <View style={styles.timelineContainer}>
-            {tasks.slice(0, 5).map((task, index) => (
+            {pendingTasks.slice(0, 5).map((task, index) => (
               <View key={task.id} style={styles.timelineItem}>
                 <View style={styles.timelineLeft}>
                   <View style={[styles.timelineIconBadge, { backgroundColor: `${THEME.colors.success}20` }]}>
                        <Text style={{fontSize: 12}}>📋</Text>
                   </View>
-                  {index !== Math.min(tasks.length, 5) - 1 && <View style={styles.timelineLine} />}
+                  {index !== Math.min(pendingTasks.length, 5) - 1 && <View style={styles.timelineLine} />}
                 </View>
                 <View style={styles.timelineContent}>
                   <Text style={styles.activityText}>
@@ -348,7 +353,7 @@ const DashboardScreen = ({ route, navigation }) => {
                 </View>
               </View>
             ))}
-            {tasks.length === 0 && <Text style={{color: THEME.colors.textMuted, marginTop: 10, textAlign: 'center'}}>No pending tasks!</Text>}
+            {pendingTasks.length === 0 && <Text style={{color: THEME.colors.textMuted, marginTop: 10, textAlign: 'center'}}>No pending tasks!</Text>}
           </View>
         </View>
 

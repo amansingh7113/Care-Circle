@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';
-import { supabase } from '../../services/supabase';
+import { createApiClient } from '../../services/apiConfig';
 
 const ManageCircleScreen = ({ navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -11,6 +11,8 @@ const ManageCircleScreen = ({ navigation }) => {
   
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const apiClient = createApiClient('/api/v1/circles');
 
   useEffect(() => {
     fetchMembers();
@@ -20,14 +22,10 @@ const ManageCircleScreen = ({ navigation }) => {
     if (!currentCircle?.id) return;
     try {
       setLoading(true);
-      // Fetch users in this circle
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, email, role')
-        .eq('circle_id', currentCircle.id);
-        
-      if (error) throw error;
-      setMembers(data || []);
+      const response = await apiClient.get(`/${currentCircle.id}`);
+      if (response.data && response.data.members) {
+        setMembers(response.data.members);
+      }
     } catch (error) {
       console.error(error);
       Alert.alert('Error', 'Failed to fetch circle members');
@@ -52,17 +50,12 @@ const ManageCircleScreen = ({ navigation }) => {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Set their circle_id to null
-              const { error } = await supabase
-                .from('users')
-                .update({ circle_id: null })
-                .eq('id', memberId);
-                
-              if (error) throw error;
+              await apiClient.delete(`/${currentCircle.id}/members/${memberId}`);
               
               Alert.alert('Success', 'Member removed');
               fetchMembers();
             } catch (err) {
+              console.error(err);
               Alert.alert('Error', 'Failed to remove member');
             }
           }
@@ -79,7 +72,7 @@ const ManageCircleScreen = ({ navigation }) => {
         </View>
         <View>
           <Text style={styles.memberName}>{item.name} {item.id === user.id ? '(You)' : ''}</Text>
-          <Text style={styles.memberEmail}>{item.email}</Text>
+          <Text style={styles.memberEmail}>{item.email || ''}</Text>
           <View style={styles.roleBadge}>
             <Text style={styles.roleText}>{item.role}</Text>
           </View>
