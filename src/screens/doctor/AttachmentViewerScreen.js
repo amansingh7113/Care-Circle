@@ -4,26 +4,36 @@ import { Ionicons } from '@expo/vector-icons';
 import { Sparkles } from 'lucide-react-native';
 import { THEME } from '../../styles/theme';
 import AIInsightsModal from '../../components/AIInsightsModal';
+import { generateInsights } from '../../services/insightsApi';
 
 const AttachmentViewerScreen = ({ route, navigation }) => {
-  const { url, isPrescription } = route.params;
+  const { url, isPrescription, autoOpenAI, documentId } = route.params;
   const [loading, setLoading] = useState(true);
   const [showAIModal, setShowAIModal] = useState(false);
   const [isAILoading, setIsAILoading] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [aiError, setAiError] = useState(null);
   
-  const dummyInsights = {
-    whats_right: ['Dosage is appropriate for your age.'],
-    needs_attention: ['Potential interaction with currently taken Aspirin.'],
-    telemetry_correlations: ['Your BP trend is stable.'],
-    actionable_recommendations: ['Take after meals.']
-  };
+  React.useEffect(() => {
+    if (autoOpenAI && documentId) {
+      handleOpenAIInsights();
+    }
+  }, [autoOpenAI, documentId]);
 
-  const handleOpenAIInsights = () => {
+  const handleOpenAIInsights = async () => {
     setShowAIModal(true);
+    if (insights) return;
     setIsAILoading(true);
-    setTimeout(() => {
+    setAiError(null);
+    try {
+      const data = await generateInsights(documentId);
+      setInsights(data.insights || data);
+    } catch (error) {
+      console.error('AI Insights Error:', error);
+      setAiError(error.message || 'Failed to load AI insights');
+    } finally {
       setIsAILoading(false);
-    }, 1500);
+    }
   };
 
   // If there's no extension or it's unknown from supabase, we could try to guess, but we'll check for typical image extensions.
@@ -63,9 +73,10 @@ const AttachmentViewerScreen = ({ route, navigation }) => {
           style={styles.image}
           resizeMode="contain"
           onLoadEnd={() => setLoading(false)}
+          onError={() => setLoading(false)}
         />
         
-        {/* We provide this button overlay in case the image fails to load (e.g. it's a PDF) */}
+        {/* We provide this button overlay in case the image fails to load or is a PDF */}
         {!loading && (
           <View style={styles.overlayButtonContainer}>
             <TouchableOpacity style={styles.openButton} onPress={handleOpenBrowser}>
@@ -78,8 +89,10 @@ const AttachmentViewerScreen = ({ route, navigation }) => {
       <AIInsightsModal
         visible={showAIModal}
         onClose={() => setShowAIModal(false)}
-        insights={dummyInsights}
+        insights={insights}
         isLoading={isAILoading}
+        error={aiError}
+        onRetry={handleOpenAIInsights}
       />
     </SafeAreaView>
   );

@@ -37,6 +37,23 @@ export const logVoiceMedicine = async (circleId, transcript) => {
   return response.data;
 };
 
+export const logVoiceMedicineAudio = async (circleId, audioUri) => {
+  const formData = new FormData();
+  formData.append('circle_id', circleId);
+  formData.append('audio', {
+    uri: audioUri,
+    type: 'audio/m4a', // expo-av default on iOS/Android is often m4a or mp4
+    name: 'voice-log.m4a',
+  });
+  
+  const response = await medicineApi.post('/voice-log-audio', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
 export const updateMedicine = async (medicineId, data) => {
   const response = await medicineApi.patch(`/${medicineId}`, data);
   return response.data;
@@ -50,5 +67,6 @@ export default {
   deleteMedicine,
   archiveMedicine,
   logVoiceMedicine,
+  logVoiceMedicineAudio,
   updateMedicine,
 };

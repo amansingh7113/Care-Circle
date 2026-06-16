@@ -3,6 +3,8 @@ const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const { GoogleGenAI } = require('@google/genai');
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
 
 const supabase = createClient(
   process.env.SUPABASE_URL, 
@@ -398,7 +400,7 @@ router.post('/voice-log', async (req, res) => {
     Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.`;
     
     const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         contents: prompt
     });
     
@@ -458,6 +460,107 @@ router.post('/voice-log', async (req, res) => {
     console.error('Voice log error:', error);
     res.status(500).json({ error: 'Failed to process voice log' });
   }
+  } catch (err) {
+    console.error('Voice log route error:', err);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// 4.8 POST /api/v1/medicines/voice-log-audio
+router.post('/voice-log-audio', upload.single('audio'), async (req, res) => {
+  try {
+    const userCircleId = req.user.circle_id;
+    const user_id = req.user.id;
+
+    if (!req.file) return res.status(400).json({ error: 'Audio file is required' });
+
+    const { data: medicines, error: medError } = await supabase
+      .from('medicines')
+      .select('id, name')
+      .eq('circle_id', userCircleId)
+      .eq('is_archived', false);
+
+    if (medError) return res.status(500).json({ error: 'Failed to fetch medicines' });
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = `
+      You are an assistant that parses voice logs for taking medicine.
+      Listen to the audio and identify which medicine(s) the user took.
+      Available medicines: ${JSON.stringify(medicines)}
+      Return a JSON array of medicine IDs. Only return valid IDs from the list.
+      If none match, return an empty array.
+      Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.`;
+      
+      const response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: [
+            {
+              inlineData: {
+                data: req.file.buffer.toString("base64"),
+                mimeType: req.file.mimetype || "audio/m4a"
+              }
+            },
+            prompt
+          ]
+      });
+      
+      const parsedText = response.text.trim().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '');
+      let medicineIds = [];
+      try {
+        medicineIds = JSON.parse(parsedText);
+      } catch(e) {
+        console.error('Failed to parse AI response:', parsedText);
+        return res.status(400).json({ error: 'Could not parse response from AI' });
+      }
+
+      if (!Array.isArray(medicineIds) || medicineIds.length === 0) {
+         return res.status(400).json({ error: 'Could not match any medicines from voice' });
+      }
+
+      const logs = [];
+      for (const medicine_id of medicineIds) {
+        const med = await supabase.from('medicines').select('circle_id, name, stock_quantity, refill_alert_threshold').eq('id', medicine_id).single();
+        
+        if (med.data && String(med.data.circle_id) === String(userCircleId)) {
+          logs.push({
+            medicine_id,
+            circle_id: userCircleId,
+            status: 'taken',
+            taken_at: new Date().toISOString(),
+            logged_by: user_id
+          });
+          
+          let currentStock = med.data.stock_quantity || 0;
+          if (currentStock > 0) {
+            currentStock -= 1;
+            await supabase.from('medicines').update({ stock_quantity: currentStock }).eq('id', medicine_id);
+            
+            const threshold = med.data.refill_alert_threshold || 5;
+            if (currentStock === threshold) {
+              await supabase.from('notifications').insert([{
+                circle_id: userCircleId,
+                type: 'REFILL_ALERT',
+                priority: 'high',
+                context: { medicine_name: med.data.name, remaining: currentStock },
+                title: `Refill Alert: ${med.data.name}`,
+                body: `Only ${currentStock} doses remaining for ${med.data.name}.`
+              }]);
+            }
+          }
+        }
+      }
+
+      if (logs.length > 0) {
+        await supabase.from('medicine_dose_logs').insert(logs);
+      }
+
+      res.status(200).json({ message: 'Voice log processed successfully', logged: logs.map(l => l.medicine_id) });
+
+    } catch (error) {
+      console.error('Voice log error:', error);
+      res.status(500).json({ error: 'Failed to process voice log' });
+    }
   } catch (err) {
     console.error('Voice log route error:', err);
     return res.status(500).json({ error: 'Internal server error' });

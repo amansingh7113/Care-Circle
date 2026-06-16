@@ -197,7 +197,7 @@ const DocumentsScreen = ({ navigation }) => {
         {item.category === 'Prescription' && (
           <TouchableOpacity 
             style={styles.actionBtn}
-            onPress={() => navigation.navigate('AttachmentViewer', { url: item.file_url, isPrescription: true })}
+            onPress={() => navigation.navigate('AttachmentViewer', { url: item.file_url, isPrescription: true, autoOpenAI: true, documentId: item.id })}
           >
             <Sparkles size={20} color={THEME.colors.primary} />
           </TouchableOpacity>

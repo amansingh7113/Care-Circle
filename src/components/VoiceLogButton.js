@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated, Modal, FlatList, Te
 import { Mic, MicOff, Check, X, AlertCircle } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import { THEME } from '../styles/theme';
-import { logVoiceMedicine } from '../services/medicineApi';
+import { logVoiceMedicine, logVoiceMedicineAudio } from '../services/medicineApi';
 
 const VoiceLogButton = ({ circleId, onSuccess }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -32,6 +32,8 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
   }, [isRecording]);
 
   const startRecording = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
     try {
       setError(null);
       const permission = await Audio.requestPermissionsAsync();
@@ -53,23 +55,40 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
     } catch (err) {
       setError('Failed to start recording');
       console.error(err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
   const stopRecording = async () => {
-    if (!recording) return;
-    setIsRecording(false);
+    if (!recording || isProcessing) return;
     setIsProcessing(true);
+    setIsRecording(false);
 
     try {
+      const uri = recording.getURI();
       await recording.stopAndUnloadAsync();
+      
+      // Revert audio mode so playback works properly and recording icon goes away on some OSes
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+      
       setRecording(null);
       
-      // Fallback to manual transcription for MVP
-      setShowTranscriptInput(true);
+      // Process voice using AI directly
+      if (uri) {
+        const response = await logVoiceMedicineAudio(circleId, uri);
+        setResults(response);
+        setShowResults(true);
+        if (onSuccess) onSuccess();
+      }
     } catch (err) {
-      setError(err.message || 'Failed to process voice log');
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to process voice log';
+      setError(errorMsg);
       console.error(err);
+      setRecording(null); // Clear it anyway so user can try again
     } finally {
       setIsProcessing(false);
     }

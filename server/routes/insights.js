@@ -117,9 +117,9 @@ router.post('/generate-manual', async (req, res) => {
     
     Correlate the instructions from the prescription with the patient's recent activity (steps), sleep quality, and medicine adherence. Provide actionable insights.`;
 
-    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timed out')), 15000));
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timed out')), 30000));
     const generatePromise = ai.models.generateContent({
-      model: 'gemini-1.5-pro',
+      model: 'gemini-2.5-flash',
       contents: [
         {
           role: 'user',
