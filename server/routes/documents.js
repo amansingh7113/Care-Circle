@@ -88,6 +88,32 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Generate a signed upload URL
+router.post('/upload-url', async (req, res) => {
+  const { fileName } = req.body;
+  const userCircleId = req.user.circle_id;
+
+  if (!fileName || !userCircleId) {
+    return res.status(400).json({ error: 'Missing fileName or circle_id' });
+  }
+
+  const filePath = `${userCircleId}/${fileName}`;
+
+  try {
+    // Generate a signed upload URL using the service role client
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUploadUrl(filePath);
+
+    if (error) throw error;
+
+    res.status(200).json({ signedUrl: data.signedUrl, token: data.token, filePath });
+  } catch (error) {
+    console.error('Error generating upload URL:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Delete a document
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
