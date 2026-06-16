@@ -496,12 +496,17 @@ router.post('/voice-log-audio', upload.single('audio'), async (req, res) => {
           model: 'gemini-2.5-flash',
           contents: [
             {
-              inlineData: {
-                data: req.file.buffer.toString("base64"),
-                mimeType: req.file.mimetype || "audio/m4a"
-              }
-            },
-            prompt
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    data: req.file.buffer.toString("base64"),
+                    mimeType: (!req.file.mimetype || req.file.mimetype === 'application/octet-stream') ? "audio/mp4" : req.file.mimetype
+                  }
+                },
+                { text: prompt }
+              ]
+            }
           ]
       });
       
