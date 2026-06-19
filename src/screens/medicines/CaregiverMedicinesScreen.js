@@ -2,7 +2,8 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, TextInput, Button, Modal, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useStore } from '../../store/useStore';
-import { getMedicines, addMedicine as addMedicineApi, deleteMedicine } from '../../services/medicineApi';
+import { getMedicines, addMedicine as addMedicineApi, deleteMedicine, scanPrescription } from '../../services/medicineApi';
+import * as ImagePicker from 'expo-image-picker';
 
 const CaregiverMedicinesScreen = () => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -19,6 +20,7 @@ const CaregiverMedicinesScreen = () => {
     stock_quantity: '',
     refill_alert_threshold: ''
   });
+  const [isScanning, setIsScanning] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -99,6 +101,50 @@ const CaregiverMedicinesScreen = () => {
     ]);
   };
 
+  const handleScanPrescription = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission needed', 'Please grant photo library access.');
+        return;
+      }
+      const pickerResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.5,
+      });
+
+      if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+
+      setIsScanning(true);
+      const res = await scanPrescription(pickerResult.assets[0].uri);
+      
+      if (res.parsedData && res.parsedData.length > 0) {
+        // Populate form with the first found medicine for MVP
+        const med = res.parsedData[0];
+        setFormData({
+          ...formData,
+          name: med.name || '',
+          dosage: med.dosage || '',
+          frequency: med.frequency || 'Daily',
+          scheduled_times: Array.isArray(med.scheduled_times) ? med.scheduled_times.join(', ') : '',
+        });
+        setModalVisible(true);
+        if (res.parsedData.length > 1) {
+          Alert.alert('Multiple Medicines Found', 'Auto-filled the first one. Please add others manually for now.');
+        } else {
+          Alert.alert('Success', 'Prescription details extracted.');
+        }
+      } else {
+        Alert.alert('Not Found', 'Could not extract medicine details from the image.');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to scan prescription.');
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
   const renderItem = ({ item }) => {
     let instructions = {};
     try {
@@ -131,7 +177,15 @@ const CaregiverMedicinesScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Button title="Add Medicine" onPress={() => setModalVisible(true)} color="#1A73E8" />
+      <View style={{flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16}}>
+        <Button title="Add Medicine" onPress={() => setModalVisible(true)} color="#1A73E8" />
+        <Button 
+          title={isScanning ? "Scanning..." : "📷 Scan Prescription"} 
+          onPress={handleScanPrescription} 
+          color="#0EA5E9" 
+          disabled={isScanning} 
+        />
+      </View>
       <FlatList
         data={medicines}
         keyExtractor={(item) => item.slot_id || item.id?.toString() || Math.random().toString()}

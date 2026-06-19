@@ -83,6 +83,32 @@ export const updateMedicine = async (medicineId, data) => {
   return response.data;
 };
 
+export const scanPrescription = async (imageUri) => {
+  const formData = new FormData();
+  formData.append('image', {
+    uri: imageUri,
+    type: 'image/jpeg',
+    name: 'prescription.jpg',
+  });
+  
+  const token = await AsyncStorage.getItem('userToken');
+  const response = await fetch(`${API_BASE_URL}/api/v1/medicines/scan-prescription`, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  if (!response.ok) {
+    let errData;
+    try { errData = await response.json(); } catch(e) {}
+    throw new Error(errData?.error || 'Failed to scan prescription');
+  }
+  
+  return await response.json();
+};
+
 export default {
   getMedicines,
   addMedicine,
@@ -93,4 +119,5 @@ export default {
   logVoiceMedicine,
   logVoiceMedicineAudio,
   updateMedicine,
+  scanPrescription,
 };

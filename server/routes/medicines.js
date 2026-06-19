@@ -63,6 +63,57 @@ router.post('/', async (req, res) => {
   }
 });
 
+// 1.5 POST /api/v1/medicines/scan-prescription
+router.post('/scan-prescription', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Prescription image is required' });
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt = `
+    You are a medical assistant extracting prescription data.
+    Read the provided prescription image. Extract a list of all medicines prescribed.
+    For each medicine, determine:
+    - "name": Medicine name
+    - "dosage": e.g., "500mg" or "1 tablet"
+    - "frequency": Choose from "Daily", "As Needed", "Specific Days"
+    - "scheduled_times": An array of time strings in HH:MM format (e.g., ["08:00", "20:00"]) based on instructions like "morning and night".
+    
+    Return purely a JSON array of these objects. Do not wrap in markdown blocks.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                data: req.file.buffer.toString("base64"),
+                mimeType: req.file.mimetype || "image/jpeg"
+              }
+            },
+            { text: prompt }
+          ]
+        }
+      ]
+    });
+
+    const parsedText = response.text.trim().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '');
+    let parsedData = [];
+    try {
+      parsedData = JSON.parse(parsedText);
+    } catch(e) {
+      console.error('Failed to parse AI response:', parsedText);
+      return res.status(400).json({ error: 'Could not parse response from AI' });
+    }
+
+    res.status(200).json({ parsedData });
+  } catch (err) {
+    console.error('Scan prescription error:', err);
+    res.status(500).json({ error: 'Failed to process prescription image' });
+  }
+});
+
 // 2. GET /api/v1/circles/:circleId/medicines (Implemented here as well for convenience, but ideally mounted correctly in index.js)
 router.get('/circles/:circleId/medicines', async (req, res) => {
   try {

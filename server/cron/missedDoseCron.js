@@ -114,50 +114,71 @@ async function checkMissedDoses() {
           });
           console.log(`[Cron] Flagging missed dose for Medicine: ${med.name} (Circle: ${med.circle_id}) at ${dose.timeStr} on ${dose.dateObj.toDateString()}`);
           
-          // Insert urgent notification for caregivers
-          getSupabase().from('notifications').insert([{
-            circle_id: med.circle_id,
-            type: 'MISSED_DOSE_ALERT',
-            priority: 'urgent',
-            context: { medicine_name: med.name, scheduled_time: dose.timeStr },
-            title: 'Missed Dose Alert',
-            body: `${med.name} was missed at ${dose.timeStr}.`
-          }]).then(async ({error}) => {
-             if (error) {
-               console.error('[Cron] Error inserting missed dose notification:', error);
-             } else {
-               // After notification insert, send push notifications
-               const { data: circleUsers } = await getSupabase()
-                 .from('users')
-                 .select('push_token')
-                 .eq('circle_id', med.circle_id)
-                 .not('push_token', 'is', null);
+           // Insert urgent notification for caregivers
+           getSupabase().from('notifications').insert([{
+             circle_id: med.circle_id,
+             type: 'MISSED_DOSE_ALERT',
+             priority: 'urgent',
+             context: { medicine_name: med.name, scheduled_time: dose.timeStr },
+             title: 'Missed Dose Alert',
+             body: `${med.name} was missed at ${dose.timeStr}.`
+           }]).then(async ({error}) => {
+              if (error) {
+                console.error('[Cron] Error inserting missed dose notification:', error);
+              } else {
+                // After notification insert, send push notifications and SMS
+                const { data: circleUsers } = await getSupabase()
+                  .from('users')
+                  .select('push_token, phone_number')
+                  .eq('circle_id', med.circle_id);
 
-               if (circleUsers && circleUsers.length > 0) {
-                 const messages = circleUsers
-                   .filter(u => u.push_token)
-                   .map(u => ({
-                     to: u.push_token,
-                     sound: 'default',
-                     title: 'Missed Dose Alert',
-                     body: `${med.name} dose was missed`,
-                     data: { type: 'MISSED_DOSE_ALERT', medicine_id: med.id }
-                   }));
-                 
-                 if (messages.length > 0) {
-                   try {
-                     await fetch('https://exp.host/--/api/v2/push/send', {
-                       method: 'POST',
-                       headers: { 'Content-Type': 'application/json' },
-                       body: JSON.stringify(messages)
-                     });
-                   } catch (pushErr) {
-                     console.error('[Cron] Push notification error:', pushErr);
-                   }
-                 }
-               }
-             }
-          });
+                if (circleUsers && circleUsers.length > 0) {
+                  // Push Notifications
+                  const pushUsers = circleUsers.filter(u => u.push_token);
+                  if (pushUsers.length > 0) {
+                    const messages = pushUsers.map(u => ({
+                      to: u.push_token,
+                      sound: 'default',
+                      title: 'Missed Dose Alert',
+                      body: `${med.name} dose was missed`,
+                      data: { type: 'MISSED_DOSE_ALERT', medicine_id: med.id }
+                    }));
+                    
+                    try {
+                      await fetch('https://exp.host/--/api/v2/push/send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(messages)
+                      });
+                    } catch (pushErr) {
+                      console.error('[Cron] Push notification error:', pushErr);
+                    }
+                  }
+
+                  // SMS Fallback
+                  const smsUsers = circleUsers.filter(u => u.phone_number);
+                  for (const user of smsUsers) {
+                    if (process.env.SMS_GATEWAY_URL) {
+                      try {
+                        console.log(`[Cron] Sending SMS fallback to ${user.phone_number}`);
+                        await fetch(process.env.SMS_GATEWAY_URL, {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            to: user.phone_number,
+                            text: `CareCircle Alert: Missed dose of ${med.name} at ${dose.timeStr}. Please check app.`
+                          })
+                        });
+                      } catch (smsErr) {
+                        console.error('[Cron] SMS fallback error:', smsErr);
+                      }
+                    } else {
+                      console.log(`[Cron] SMS_GATEWAY_URL not configured. Mocking SMS to ${user.phone_number}`);
+                    }
+                  }
+                }
+              }
+           });
         }
       }
     }

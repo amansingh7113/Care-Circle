@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { Pill } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { getCircleDetails } from '../services/circleApi';
 import { getSleepLogs } from '../services/sleepApi';
 import { getMedicines, logAdministration } from '../services/medicineApi';
@@ -11,6 +12,8 @@ import { getVitals } from '../services/vitalsApi';
 import { getSteps } from '../services/stepApi';
 import { getDoctorVisits } from '../services/doctorVisitApi';
 import { getTodayHydration, logHydration } from '../services/hydrationApi';
+import { getTodayNutrition, logNutrition, scanMeal } from '../services/nutritionApi';
+import { syncWearableSteps } from '../services/wearablesApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
 import { useStore } from '../store/useStore';
@@ -19,6 +22,7 @@ import * as Sharing from 'expo-sharing';
 import { generatePdfTemplate } from '../utils/pdfTemplate';
 import LogBloodPressureModal from './home/LogBloodPressureModal';
 import AdBanner from '../components/AdBanner';
+import api from '../services/api';
 
 const vitalsConfig = [
   { id: '1', label: 'Blood Pressure', value: '--/--', icon: '❤️', color: THEME.colors.alert },
@@ -39,6 +43,9 @@ const DashboardScreen = ({ route, navigation }) => {
   const [loggingMedId, setLoggingMedId] = useState(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [hydrationMl, setHydrationMl] = useState(0);
+  const [nutritionCalories, setNutritionCalories] = useState(0);
+  const [isScanningMeal, setIsScanningMeal] = useState(false);
+  const [isSyncingWearable, setIsSyncingWearable] = useState(false);
   const [loggingWater, setLoggingWater] = useState(false);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -150,31 +157,91 @@ const DashboardScreen = ({ route, navigation }) => {
 
   const fetchCircleData = useCallback(async () => {
     setIsLoading(true);
-    try {
-      // Run API calls in parallel for better performance
-      const [circleData, dashboardData, hydrationData] = await Promise.all([
-        getCircleDetails(circleId).catch(() => ({ members: [] })),
-        getDashboardAggregated(circleId).catch(() => ({ vitals: [], sleep: [], steps: [], medicines: [], tasks: [] })),
-        getTodayHydration().catch(() => ({ total_ml: 0 }))
-      ]);
-      
-      setMembers(circleData?.members || []);
-      setHydrationMl(hydrationData?.total_ml || 0);
-      setSleepLogs(Array.isArray(dashboardData?.sleep) ? dashboardData.sleep : []);
-      setBloodPressureLogs(Array.isArray(dashboardData?.vitals) ? dashboardData.vitals : []);
-      setMedicines(dashboardData?.medicines || (Array.isArray(dashboardData?.medicines) ? dashboardData.medicines : []));
-      setStepLogs(Array.isArray(dashboardData?.steps) ? dashboardData.steps : []);
-      setTasks(Array.isArray(dashboardData?.tasks) ? dashboardData.tasks : []);
-    } catch (error) {
-      console.error('Failed to fetch dashboard data', error);
-      Alert.alert('Error', 'Failed to load some dashboard details');
-    } finally {
-      setIsLoading(false);
+    if (circleId) {
+      try {
+        const [dashboardResponse, hydrationData, nutritionData] = await Promise.all([
+          api.get('/api/v1/dashboard', { params: { circle_id: circleId } }),
+          getTodayHydration().catch(() => ({ total_ml: 0 })),
+          getTodayNutrition().catch(() => ({ total_calories: 0 }))
+        ]);
+        
+        const dashboardData = dashboardResponse.data?.data;
+        setBloodPressureLogs(Array.isArray(dashboardData?.vitals) ? dashboardData.vitals : []);
+        setSleepLogs(Array.isArray(dashboardData?.sleep) ? dashboardData.sleep : []);
+        setStepLogs(Array.isArray(dashboardData?.steps) ? dashboardData.steps : []);
+        setMedicines(Array.isArray(dashboardData?.medicines) ? dashboardData.medicines : []);
+        setTasks(Array.isArray(dashboardData?.tasks) ? dashboardData.tasks : []);
+        setHydrationMl(hydrationData?.total_ml || 0);
+        setNutritionCalories(nutritionData?.total_calories || 0);
+      } catch (error) {
+        console.error('Failed to fetch dashboard data', error);
+        Alert.alert('Error', 'Failed to load some dashboard details');
+      } finally {
+        setIsLoading(false);
+      }
     }
   }, [circleId, setBloodPressureLogs, setSleepLogs, setStepLogs]);
 
   const getInitials = (name) => {
     return name ? name.substring(0, 2).toUpperCase() : 'U';
+  };
+
+  const handleScanMeal = async () => {
+    try {
+      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permissionResult.granted) {
+        Alert.alert('Permission needed', 'Please grant camera access.');
+        return;
+      }
+      const pickerResult = await ImagePicker.launchCameraAsync({
+        quality: 0.5,
+      });
+
+      if (pickerResult.canceled || !pickerResult.assets?.[0]) return;
+
+      setIsScanningMeal(true);
+      const res = await scanMeal(pickerResult.assets[0].uri);
+      
+      if (res && res.calories) {
+        Alert.alert(
+          'Meal Scanned 🥗', 
+          `Identified: ${res.food_items}\nEstimated Calories: ${res.calories} kcal\nSugar: ${res.sugar_g}g\nSodium: ${res.sodium_mg}mg\n\nLog this meal?`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Log Meal', onPress: async () => {
+                const logged = await logNutrition({
+                  meal_type: res.meal_type || 'Snack',
+                  food_items: res.food_items,
+                  calories: res.calories,
+                  sugar_g: res.sugar_g,
+                  sodium_mg: res.sodium_mg,
+                });
+                setNutritionCalories(prev => prev + res.calories);
+            }}
+          ]
+        );
+      } else {
+        Alert.alert('Not Found', 'Could not extract meal details.');
+      }
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to scan meal.');
+    } finally {
+      setIsScanningMeal(false);
+    }
+  };
+
+  const handleSyncWearable = async () => {
+    try {
+      setIsSyncingWearable(true);
+      const steps = await syncWearableSteps(circleId);
+      Alert.alert('Sync Complete', `Synced ${steps} steps from Google Fit/Health Connect.`);
+      fetchCircleData(); // Refresh UI
+    } catch (err) {
+      Alert.alert('Sync Error', err.message || 'Failed to sync wearable data.');
+    } finally {
+      setIsSyncingWearable(false);
+    }
   };
 
   const getMedTime = (med) => med?.time || med?.scheduled_time || (med?.instructions?.scheduled_times ? med.instructions.scheduled_times[0] : 'Upcoming');
@@ -315,7 +382,32 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         </View>
 
+        {/* Hydration & Diet Widget */}
+        <View style={styles.hydrationContainer}>
+          <View style={{flex: 1}}>
+            <Text style={styles.sectionTitle}>Daily Water Goal</Text>
+            <Text style={styles.hydrationText}>{hydrationMl} ml / 2000 ml</Text>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, { width: `${Math.min((hydrationMl / 2000) * 100, 100)}%` }]} />
+            </View>
+            <TouchableOpacity style={styles.logWaterBtn} onPress={handleLogWater}>
+              <Text style={styles.logWaterBtnText}>+ 250ml 💧</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{flex: 1, marginLeft: 16}}>
+            <Text style={styles.sectionTitle}>Diet Intake</Text>
+            <Text style={styles.hydrationText}>{nutritionCalories} kcal logged</Text>
+            <View style={[styles.progressBarBg, { backgroundColor: '#fcd34d' }]}>
+              <View style={[styles.progressBarFill, { width: `${Math.min((nutritionCalories / 2500) * 100, 100)}%`, backgroundColor: '#fbbf24' }]} />
+            </View>
+            <TouchableOpacity style={[styles.logWaterBtn, {backgroundColor: '#f59e0b'}]} onPress={handleScanMeal} disabled={isScanningMeal}>
+              <Text style={styles.logWaterBtnText}>{isScanningMeal ? "Scanning..." : "📷 Scan Meal"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Module: Single-Tap Interactive Medication Card */}
+        <Text style={styles.sectionTitle}>Upcoming Medication</Text>
         {nextMed && (
           <View style={styles.nextMedSection}>
             <View style={styles.nextMedCard}>
@@ -345,29 +437,16 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Module: Hydration Tracker */}
-        <View style={styles.hydrationSection}>
-          <View style={styles.hydrationCard}>
-            <View style={{flex: 1}}>
-              <Text style={styles.hydrationTitle}>Daily Hydration</Text>
-              <Text style={styles.hydrationValue}>{hydrationMl} <Text style={{fontSize: 16, color: THEME.colors.textBody}}>out of 2000 ml</Text></Text>
-              <View style={[styles.vitalBarContainer, { backgroundColor: '#E0F2FE', marginTop: 8 }]}>
-                <View style={[styles.vitalBarFill, { backgroundColor: '#0EA5E9', width: `${Math.min(100, (hydrationMl/2000)*100)}%` }]} />
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.waterButton} 
-              onPress={handleLogWater}
-              disabled={loggingWater}
-            >
-              {loggingWater ? <ActivityIndicator color="#FFF" /> : <Text style={styles.waterButtonText}>+ 250ml 💧</Text>}
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Module B: Wellness Vitals Quick-Grid */}
         <View style={styles.vitalsSection}>
-          <Text style={styles.sectionTitle}>Vitals</Text>
+          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
+            <Text style={[styles.sectionTitle, {marginBottom: 0}]}>Vitals</Text>
+            <TouchableOpacity onPress={handleSyncWearable} disabled={isSyncingWearable} style={{backgroundColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16}}>
+              <Text style={{fontSize: 12, fontWeight: 'bold', color: THEME.colors.primary}}>
+                {isSyncingWearable ? "Syncing..." : "⌚ Sync Wearable"}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <View style={styles.vitalsGrid}>
             {vitalsConfig.map(vital => {
               const isBP = vital.label === 'Blood Pressure';
@@ -632,28 +711,12 @@ const styles = StyleSheet.create({
   logButtonText: { color: THEME.colors.primary, fontWeight: '800', fontSize: 14 },
 
   // Hydration Styles
-  hydrationSection: { marginBottom: 24 },
-  hydrationCard: {
-    backgroundColor: THEME.colors.white,
-    padding: 20,
-    borderRadius: THEME.borderRadius.card,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    ...THEME.shadows.soft,
-    borderWidth: 1,
-    borderColor: '#E0F2FE'
-  },
-  hydrationTitle: { color: '#0EA5E9', fontWeight: '700', marginBottom: 4 },
-  hydrationValue: { fontSize: 24, fontWeight: '800', color: THEME.colors.textHeader },
-  waterButton: {
-    backgroundColor: '#0EA5E9',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginLeft: 16
-  },
-  waterButtonText: { color: THEME.colors.white, fontWeight: 'bold' },
+  hydrationContainer: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, flexDirection: 'row', justifyContent: 'space-between' },
+  hydrationText: { fontWeight: '700', fontSize: 14, color: '#374151', marginBottom: 8 },
+  progressBarBg: { height: 8, backgroundColor: '#e0f2fe', borderRadius: 4, marginBottom: 12 },
+  progressBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#0ea5e9' },
+  logWaterBtn: { backgroundColor: '#0ea5e9', padding: 8, borderRadius: 8, alignItems: 'center' },
+  logWaterBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   
   // Vitals Grid Styles
   vitalsSection: { marginBottom: 28 },

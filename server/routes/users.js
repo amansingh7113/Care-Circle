@@ -47,10 +47,27 @@ router.put('/profile', async (req, res) => {
       console.error('Update profile error:', error);
       return res.status(500).json({ error: 'Failed to update profile' });
     }
-
-    res.status(200).json({ user: data });
+    
+    res.status(200).json(data);
   } catch (err) {
-    console.error('Update profile catch error:', err);
+    console.error('Get profile error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/v1/users/streak
+router.get('/streak', authenticate, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('current_streak')
+      .eq('id', req.user.id)
+      .single();
+
+    if (error) throw error;
+    res.status(200).json({ streak: data.current_streak || 0 });
+  } catch (err) {
+    console.error('Get streak error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

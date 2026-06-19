@@ -40,6 +40,7 @@ const insightsRouter = require('./routes/insights');
 const notificationsRouter = require('./routes/notifications');
 const exportRouter = require('./routes/export');
 const paymentsRouter = require('./routes/payments');
+const nutritionRouter = require('./routes/nutrition');
 
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/circles', circlesRouter);
@@ -57,6 +58,7 @@ app.use('/api/v1/insights', insightsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/export', exportRouter);
 app.use('/api/v1/payments', paymentsRouter);
+app.use('/api/v1/nutrition', nutritionRouter);
 
 app.get('/api/v1/dashboard', authenticate, async (req, res) => {
   try {
@@ -90,12 +92,14 @@ const runMigrations = require('./db/migrate');
 
 const { startCron } = require('./cron/missedDoseCron');
 const { startInsightsCron } = require('./cron/insightsProcessor');
+const { startStreakCron } = require('./cron/streakCron');
 
 async function startServer() {
   await runMigrations();
   
   startCron();
   startInsightsCron();
+  startStreakCron();
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`CareCircle server listening on port ${port} (IPv4)`);
