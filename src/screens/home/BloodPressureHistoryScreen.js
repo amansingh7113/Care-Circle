@@ -141,9 +141,9 @@ const BloodPressureHistoryScreen = ({ navigation }) => {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <EmptyState 
-              icon="heart" 
-              title="No records yet" 
-              message="Tap the + icon to log your blood pressure." 
+              iconName="heart" 
+              titleText="No records yet" 
+              subtitleText="Tap the + icon to log your blood pressure." 
             />
           }
         />

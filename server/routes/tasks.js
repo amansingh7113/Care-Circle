@@ -68,7 +68,7 @@ router.get('/circles/:circleId/tasks', async (req, res) => {
 
   let query = supabase
     .from('tasks')
-    .select('*')
+    .select('*, assignee:users(name)')
     .eq('circle_id', circleId);
 
   if (status && ['pending', 'completed'].includes(status)) {
@@ -176,7 +176,7 @@ router.post('/:id/comments', async (req, res) => {
       {
         task_id: taskId,
         user_id: userId,
-        comment,
+        content: comment,
         created_at: new Date().toISOString()
       }
     ])
@@ -228,11 +228,15 @@ router.get('/:id/comments', async (req, res) => {
     }
 
     // Flatten user data for the client
-    const formattedComments = (comments || []).map(c => ({
-      ...c,
-      user: c.users || { name: 'Unknown' },
-    }));
-    delete formattedComments.users;
+    const formattedComments = (comments || []).map(c => {
+      const formatted = {
+        ...c,
+        comment: c.content, // Map content to comment for frontend compatibility
+        user: c.users || { name: 'Unknown' }
+      };
+      delete formatted.users;
+      return formatted;
+    });
 
     res.status(200).json(formattedComments);
   } catch (err) {

@@ -3,12 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as DocumentPicker from 'expo-document-picker';
-import { getDocuments, addDocumentMetadata, deleteDocument, getUploadUrl } from '../../services/documentsApi';
+import { getDocuments, addDocumentMetadata, deleteDocument, uploadEncryptedFile } from '../../services/documentsApi';
 import { getDoctorVisits } from '../../services/doctorVisitApi';
 import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';
 import { useFocusEffect } from '@react-navigation/native';
-import { supabase } from '../../services/supabase';
 import { FileText, Trash2, Download, Tag, Sparkles } from 'lucide-react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 
@@ -97,39 +96,14 @@ const DocumentsScreen = ({ navigation }) => {
       setIsUploading(true);
       setShowVisitModal(false);
       
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const contentType = file.mimeType || 'application/octet-stream';
-
-      // Get signed upload URL from backend
-      const { signedUrl, filePath } = await getUploadUrl(fileName, contentType);
-
-      const response = await fetch(file.uri);
-      const arrayBuffer = await response.arrayBuffer();
-
-      // Upload directly to Supabase using the signed URL
-      const uploadResponse = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.mimeType || 'application/octet-stream'
-        },
-        body: arrayBuffer
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error(`Upload failed with status ${uploadResponse.status}`);
-      }
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
+      const uploadResult = await uploadEncryptedFile(file.uri, file.name, file.mimeType);
 
       await addDocumentMetadata({
         circle_id: circleId,
         uploaded_by: user.id,
         title: file.name,
         category: activeCategory,
-        file_url: publicUrl,
+        file_url: uploadResult.url,
         visit_id: visitId
       });
 
@@ -144,7 +118,7 @@ const DocumentsScreen = ({ navigation }) => {
     }
   };
 
-  const handleDelete = async (docId, fileUrl) => {
+  const handleDelete = async (docId) => {
     Alert.alert('Delete Document', 'Are you sure you want to delete this document?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -153,18 +127,6 @@ const DocumentsScreen = ({ navigation }) => {
         onPress: async () => {
           try {
             await deleteDocument(docId);
-            
-            try {
-              const urlParts = fileUrl.split('/');
-              const bucketIndex = urlParts.findIndex(p => p === 'documents');
-              if (bucketIndex !== -1) {
-                const filePath = urlParts.slice(bucketIndex + 1).join('/');
-                await supabase.storage.from('documents').remove([filePath]);
-              }
-            } catch (e) {
-              console.log('Could not remove file from storage', e);
-            }
-
             fetchDocsAndVisits();
           } catch (error) {
             Alert.alert('Error', 'Failed to delete document');
@@ -210,7 +172,7 @@ const DocumentsScreen = ({ navigation }) => {
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.actionBtn}
-          onPress={() => handleDelete(item.id, item.file_url)}
+          onPress={() => handleDelete(item.id)}
         >
           <Trash2 size={20} color={THEME.colors.alert || '#E53935'} />
         </TouchableOpacity>

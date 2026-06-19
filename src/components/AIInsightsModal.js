@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Modal, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { X, Sparkles, CheckCircle, AlertTriangle, TrendingUp, Lightbulb, Clock } from 'lucide-react-native';
 import { THEME } from '../styles/theme';
+import ErrorBoundary from './ErrorBoundary';
 
 const AIInsightsModal = ({ visible, onClose, insights, isLoading, error, onRetry }) => {
   const [showManualFallback, setShowManualFallback] = useState(false);
@@ -125,4 +126,12 @@ const styles = StyleSheet.create({
   retryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
-export default AIInsightsModal;
+});
+
+export default function WrappedAIInsightsModal(props) {
+  return (
+    <ErrorBoundary>
+      <AIInsightsModal {...props} />
+    </ErrorBoundary>
+  );
+}

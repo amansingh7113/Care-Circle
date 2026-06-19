@@ -202,4 +202,115 @@ router.post('/generate-manual', async (req, res) => {
   }
 });
 
+router.get('/health-score', async (req, res) => {
+  try {
+    const circleId = req.user.circle_id;
+    if (!circleId) return res.status(400).json({ error: 'User does not belong to a circle' });
+
+    const { data: insight, error } = await supabase
+      .from('ai_insights_history')
+      .select('insight_data, created_at')
+      .eq('circle_id', circleId)
+      .is('prescription_id', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!insight || !insight.insight_data) {
+      return res.status(200).json({ health_score: 'Status Unknown', status: 'Unknown', period: null });
+    }
+
+    res.status(200).json({
+      health_score: insight.insight_data.health_score,
+      status: insight.insight_data.status,
+      period: insight.insight_data.period,
+      missing_data: insight.insight_data.missing_data,
+      created_at: insight.created_at
+    });
+  } catch (error) {
+    console.error('Error fetching health score:', error);
+    res.status(500).json({ error: 'Failed to fetch health score' });
+  }
+});
+
+router.get('/correlations', async (req, res) => {
+  try {
+    const circleId = req.user.circle_id;
+    if (!circleId) return res.status(400).json({ error: 'User does not belong to a circle' });
+
+    const { data: insight, error } = await supabase
+      .from('ai_insights_history')
+      .select('insight_data, created_at')
+      .eq('circle_id', circleId)
+      .is('prescription_id', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (!insight || !insight.insight_data) {
+      return res.status(200).json({ correlations: [] });
+    }
+
+    res.status(200).json({
+      correlations: insight.insight_data.correlations || [],
+      period: insight.insight_data.period,
+      created_at: insight.created_at
+    });
+  } catch (error) {
+    console.error('Error fetching correlations:', error);
+    res.status(500).json({ error: 'Failed to fetch correlations' });
+  }
+});
+
+router.get('/doctor-summary', async (req, res) => {
+  try {
+    const circleId = req.user.circle_id;
+    if (!circleId) return res.status(400).json({ error: 'User does not belong to a circle' });
+
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
+
+    const [stepsRes, sleepRes, medsRes] = await Promise.all([
+      supabase.from('step_logs').select('date, step_count').eq('circle_id', circleId).gte('date', thirtyDaysAgoIso),
+      supabase.from('sleep_logs').select('sleep_start, sleep_end, quality, notes').eq('circle_id', circleId).gte('created_at', thirtyDaysAgoIso),
+      supabase.from('medicine_dose_logs').select('status, taken_at').eq('circle_id', circleId).gte('taken_at', thirtyDaysAgoIso)
+    ]);
+
+    const telemetry = {
+      steps: stepsRes.data || [],
+      sleep: sleepRes.data || [],
+      medicines: medsRes.data || []
+    };
+
+    const telemetrySummary = JSON.stringify(telemetry);
+
+    const prompt = `You are a professional medical assistant writing a concise 1-page health briefing for a doctor's visit. 
+Based on the following 30-day telemetry data of a patient (steps, sleep quality, medication adherence), write a clear, readable markdown summary.
+Highlight key trends, any medication adherence issues (missed doses), sleep issues, and overall activity status.
+
+Telemetry Data:
+${telemetrySummary}`;
+
+    const generatePromise = ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt
+    });
+
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timed out')), 30000));
+    const response = await Promise.race([generatePromise, timeoutPromise]);
+
+    const summaryText = response.text;
+
+    res.status(200).json({ summary: summaryText });
+  } catch (error) {
+    console.error('Error generating doctor summary:', error);
+    res.status(500).json({ error: 'Failed to generate summary' });
+  }
+});
+
 module.exports = router;

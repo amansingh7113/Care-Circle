@@ -1,16 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Modal, FlatList, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Modal, TextInput, ScrollView } from 'react-native';
 import { Mic, MicOff, Check, X, AlertCircle } from 'lucide-react-native';
 import { Audio } from 'expo-av';
 import { THEME } from '../styles/theme';
-import { logVoiceMedicine, logVoiceMedicineAudio } from '../services/medicineApi';
+import { logVoiceMedicine, logVoiceMedicineAudio, logAdministration } from '../services/medicineApi';
+import ErrorBoundary from './ErrorBoundary';
 
 const VoiceLogButton = ({ circleId, onSuccess }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState(null);
-  const [showResults, setShowResults] = useState(false);
+  
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [parsedItems, setParsedItems] = useState([]);
+  
   const [error, setError] = useState(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const [showTranscriptInput, setShowTranscriptInput] = useState(false);
@@ -69,7 +72,6 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
       const uri = recording.getURI();
       await recording.stopAndUnloadAsync();
       
-      // Revert audio mode so playback works properly and recording icon goes away on some OSes
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
@@ -77,18 +79,20 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
       
       setRecording(null);
       
-      // Process voice using AI directly
       if (uri) {
         const response = await logVoiceMedicineAudio(circleId, uri);
-        setResults(response);
-        setShowResults(true);
-        if (onSuccess) onSuccess();
+        if (response.parsedData && response.parsedData.length > 0) {
+          setParsedItems(response.parsedData);
+          setShowConfirmation(true);
+        } else {
+          setError('No medicines were matched in the voice log');
+        }
       }
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.message || 'Failed to process voice log';
       setError(errorMsg);
       console.error(err);
-      setRecording(null); // Clear it anyway so user can try again
+      setRecording(null); 
     } finally {
       setIsProcessing(false);
     }
@@ -100,10 +104,13 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
     setIsProcessing(true);
     try {
       const response = await logVoiceMedicine(circleId, transcriptText.trim());
-      setResults(response);
-      setShowResults(true);
+      if (response.parsedData && response.parsedData.length > 0) {
+        setParsedItems(response.parsedData);
+        setShowConfirmation(true);
+      } else {
+        setError('No medicines were matched in the transcript');
+      }
       setTranscriptText('');
-      if (onSuccess) onSuccess();
     } catch (err) {
       const errorMsg = err.response?.data?.error || err.message || 'Failed to process voice log';
       setError(errorMsg);
@@ -112,11 +119,39 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
     }
   };
 
+  const handleConfirmLogs = async () => {
+    setIsProcessing(true);
+    try {
+      const validItems = parsedItems.filter(item => item.medicine_id);
+      
+      for (const item of validItems) {
+        await logAdministration(item.medicine_id, item.action === 'skipped' ? 'skipped' : 'taken');
+      }
+      
+      setShowConfirmation(false);
+      if (onSuccess) onSuccess();
+    } catch (err) {
+      const errorMsg = err.response?.data?.error || err.message || 'Failed to save logs';
+      setError(errorMsg);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const removeItem = (index) => {
+    const updated = [...parsedItems];
+    updated.splice(index, 1);
+    setParsedItems(updated);
+    if (updated.length === 0) {
+      setShowConfirmation(false);
+      setError('All items removed.');
+    }
+  };
+
   const handlePress = () => {
     if (isRecording) {
       stopRecording();
     } else {
-      // Start recording
       startRecording();
     }
   };
@@ -127,6 +162,7 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
         <TouchableOpacity
           style={[styles.fab, isRecording && styles.fabRecording, isProcessing && styles.fabProcessing]}
           onPress={handlePress}
+          onLongPress={() => setShowTranscriptInput(true)}
           disabled={isProcessing}
           activeOpacity={0.8}
         >
@@ -143,13 +179,12 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
         )}
       </Animated.View>
 
-      {/* Transcript Input Modal */}
       <Modal visible={showTranscriptInput} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.transcriptModal}>
             <View style={styles.transcriptHeader}>
               <Mic size={20} color={THEME.colors.primary} />
-              <Text style={styles.transcriptTitle}>Voice Medicine Log</Text>
+              <Text style={styles.transcriptTitle}>Manual Entry / Transcript</Text>
               <TouchableOpacity onPress={() => setShowTranscriptInput(false)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <X size={22} color={THEME.colors.textMuted} />
               </TouchableOpacity>
@@ -180,37 +215,46 @@ const VoiceLogButton = ({ circleId, onSuccess }) => {
         </View>
       </Modal>
 
-      {/* Results Modal */}
-      <Modal visible={showResults} animationType="fade" transparent>
+      <Modal visible={showConfirmation} animationType="fade" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.resultsModal}>
             <View style={styles.resultsHeader}>
-              <Text style={styles.resultsTitle}>Voice Log Results</Text>
-              <TouchableOpacity onPress={() => { setShowResults(false); setResults(null); }} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
+              <Text style={styles.resultsTitle}>Confirm Voice Logs</Text>
+              <TouchableOpacity onPress={() => setShowConfirmation(false)} hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}>
                 <X size={22} color={THEME.colors.textMuted} />
               </TouchableOpacity>
             </View>
-            {results?.message && (
-              <View style={styles.resultItem}>
-                <View style={[styles.resultIcon, { backgroundColor: (THEME.colors.success || '#34C759') + '20' }]}>
-                  <Check size={16} color={THEME.colors.success || '#34C759'} />
+            
+            <ScrollView style={{ maxHeight: 300, marginBottom: 16 }}>
+              {parsedItems.map((item, index) => (
+                <View key={index} style={styles.parsedItem}>
+                  <View style={{flex: 1}}>
+                    <Text style={styles.parsedMedicineName}>{item.medicine_name || 'Unknown'}</Text>
+                    <Text style={styles.parsedDetail}>
+                      Action: <Text style={{fontWeight: '600', color: item.action === 'skipped' ? THEME.colors.alert : THEME.colors.success}}>{item.action}</Text>
+                    </Text>
+                    {item.dosage ? <Text style={styles.parsedDetail}>Dosage: {item.dosage}</Text> : null}
+                    {!item.medicine_id && <Text style={{color: THEME.colors.alert, fontSize: 12, marginTop: 4}}>* Cannot find medicine in circle</Text>}
+                  </View>
+                  <TouchableOpacity onPress={() => removeItem(index)} style={{padding: 8}}>
+                    <X size={20} color={THEME.colors.textMuted} />
+                  </TouchableOpacity>
                 </View>
-                <View style={styles.resultContent}>
-                  <Text style={styles.resultMedicine}>{results.message}</Text>
-                </View>
-              </View>
-            )}
-            {results?.logged && results.logged.length > 0 && (
-              <Text style={styles.processedCount}>{results.logged.length} medicine(s) logged successfully</Text>
-            )}
-            {results?.logged && results.logged.length === 0 && (
-              <Text style={styles.processedCount}>No medicines were matched</Text>
-            )}
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.submitButton, isProcessing && styles.submitDisabled]} 
+              onPress={handleConfirmLogs}
+              disabled={isProcessing}
+            >
+              <Check size={20} color="#fff" />
+              <Text style={styles.submitText}>{isProcessing ? 'Saving...' : 'Confirm Logs'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Error Toast */}
       {error && (
         <View style={styles.errorToast}>
           <AlertCircle size={16} color="#fff" />
@@ -241,17 +285,22 @@ const styles = StyleSheet.create({
   submitButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: THEME.colors.primary, paddingVertical: 16, borderRadius: THEME.borderRadius.pill },
   submitDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
-  resultsModal: { backgroundColor: THEME.colors.cardBg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '60%' },
+  resultsModal: { backgroundColor: THEME.colors.cardBg, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: '80%' },
   resultsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   resultsTitle: { ...THEME.typography.cardTitle, fontSize: 18 },
-  resultItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.border },
-  resultIcon: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  resultContent: { flex: 1 },
-  resultMedicine: { ...THEME.typography.cardTitle },
-  resultMessage: { ...THEME.typography.muted, marginTop: 2 },
-  processedCount: { ...THEME.typography.muted, textAlign: 'center', marginTop: 16 },
+  parsedItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: THEME.colors.border },
+  parsedMedicineName: { ...THEME.typography.cardTitle, fontSize: 16, marginBottom: 4 },
+  parsedDetail: { ...THEME.typography.muted, fontSize: 14 },
   errorToast: { position: 'absolute', bottom: 100, left: 20, right: 20, backgroundColor: THEME.colors.alert, borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 200 },
   errorText: { color: '#fff', flex: 1, fontSize: 13, fontWeight: '600' }
 });
 
-export default VoiceLogButton;
+});
+
+export default function WrappedVoiceLogButton(props) {
+  return (
+    <ErrorBoundary>
+      <VoiceLogButton {...props} />
+    </ErrorBoundary>
+  );
+}

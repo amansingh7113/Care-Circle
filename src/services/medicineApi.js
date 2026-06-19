@@ -9,8 +9,21 @@ export const getMedicines = async (circleId) => {
 };
 
 export const addMedicine = async (circleId, data) => {
-  const response = await medicineApi.post('/', { ...data, circle_id: circleId });
-  return response.data;
+  const token = await AsyncStorage.getItem('userToken');
+  const response = await fetch(`${API_BASE_URL}/api/v1/medicines`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({ ...data, circle_id: circleId })
+  });
+  if (!response.ok) {
+    let errData;
+    try { errData = await response.json(); } catch(e) {}
+    throw new Error(errData?.error || `HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
 };
 
 export const logAdministration = async (medicineId, status, scheduledTime) => {

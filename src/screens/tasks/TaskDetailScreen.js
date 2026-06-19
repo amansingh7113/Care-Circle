@@ -151,7 +151,7 @@ const TaskDetailScreen = ({ route, navigation }) => {
             </View>
             <View style={styles.metaItem}>
               <User size={16} color={THEME.colors.textMuted} />
-              <Text style={styles.metaText}>{task.assigned_to || task.assignee || 'Unassigned'}</Text>
+              <Text style={styles.metaText}>{task.assignee?.name || 'Unassigned'}</Text>
             </View>
             {task.category && (
               <View style={styles.metaItem}>

@@ -101,8 +101,8 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
   const userIds = [...new Set(logs?.map(l => l.logged_by).filter(Boolean) || [])];
   let usersMap = {};
   if (userIds.length > 0) {
-    const { data: usersData } = await supabase.from('users').select('id, full_name').in('id', userIds);
-    usersData?.forEach(u => { usersMap[u.id] = u.full_name || 'Family Member'; });
+    const { data: usersData } = await supabase.from('users').select('id, name').in('id', userIds);
+    usersData?.forEach(u => { usersMap[u.id] = u.name || 'Family Member'; });
   }
 
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -377,7 +377,6 @@ router.post('/voice-log', async (req, res) => {
   try {
     const { transcript } = req.body;
   const userCircleId = req.user.circle_id;
-  const user_id = req.user.id;
 
   if (!transcript) return res.status(400).json({ error: 'Transcript is required' });
 
@@ -395,9 +394,15 @@ router.post('/voice-log', async (req, res) => {
     You are an assistant that parses voice logs for taking medicine.
     User transcript: "${transcript}"
     Available medicines: ${JSON.stringify(medicines)}
-    Identify which medicine(s) the user took. Return a JSON array of medicine IDs. Only return valid IDs from the list.
-    If none match, return an empty array.
-    Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.`;
+    
+    Return a JSON array of objects, where each object has the following keys:
+    - "medicine_id": the id of the medicine from the provided list, or null if it cannot be determined.
+    - "medicine_name": the name of the medicine.
+    - "dosage": the dosage mentioned (or null if not mentioned).
+    - "action": either "taken" or "skipped".
+    
+    If none match or cannot be parsed, return an empty array [].
+    Output purely JSON. Do not wrap in markdown blocks.`;
     
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -405,56 +410,19 @@ router.post('/voice-log', async (req, res) => {
     });
     
     const parsedText = response.text.trim().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '');
-    let medicineIds = [];
+    let parsedData = [];
     try {
-      medicineIds = JSON.parse(parsedText);
+      parsedData = JSON.parse(parsedText);
     } catch(e) {
       console.error('Failed to parse AI response:', parsedText);
       return res.status(400).json({ error: 'Could not parse response from AI' });
     }
 
-    if (!Array.isArray(medicineIds) || medicineIds.length === 0) {
+    if (!Array.isArray(parsedData) || parsedData.length === 0) {
        return res.status(400).json({ error: 'Could not match any medicines from transcript' });
     }
 
-    const logs = [];
-    for (const medicine_id of medicineIds) {
-      const med = await supabase.from('medicines').select('circle_id, name, stock_quantity, refill_alert_threshold').eq('id', medicine_id).single();
-      
-      if (med.data && med.data.circle_id === userCircleId) {
-        logs.push({
-          medicine_id,
-          circle_id: userCircleId,
-          status: 'taken',
-          taken_at: new Date().toISOString(),
-          logged_by: user_id
-        });
-        
-        let currentStock = med.data.stock_quantity || 0;
-        if (currentStock > 0) {
-          currentStock -= 1;
-          await supabase.from('medicines').update({ stock_quantity: currentStock }).eq('id', medicine_id);
-          
-          const threshold = med.data.refill_alert_threshold || 5;
-          if (currentStock === threshold) {
-            await supabase.from('notifications').insert([{
-              circle_id: userCircleId,
-              type: 'REFILL_ALERT',
-              priority: 'high',
-              context: { medicine_name: med.data.name, remaining: currentStock },
-              title: `Refill Alert: ${med.data.name}`,
-              body: `Only ${currentStock} doses remaining for ${med.data.name}.`
-            }]);
-          }
-        }
-      }
-    }
-
-    if (logs.length > 0) {
-      await supabase.from('medicine_dose_logs').insert(logs);
-    }
-
-    res.status(200).json({ message: 'Voice log processed successfully', logged: logs.map(l => l.medicine_id) });
+    res.status(200).json({ message: 'Voice log parsed successfully', parsedData });
 
   } catch (error) {
     console.error('Voice log error:', error);
@@ -470,7 +438,6 @@ router.post('/voice-log', async (req, res) => {
 router.post('/voice-log-audio', upload.single('audio'), async (req, res) => {
   try {
     const userCircleId = req.user.circle_id;
-    const user_id = req.user.id;
 
     if (!req.file) return res.status(400).json({ error: 'Audio file is required' });
 
@@ -486,11 +453,17 @@ router.post('/voice-log-audio', upload.single('audio'), async (req, res) => {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const prompt = `
       You are an assistant that parses voice logs for taking medicine.
-      Listen to the audio and identify which medicine(s) the user took.
+      Listen to the audio and extract information about the medicine(s) the user interacted with.
       Available medicines: ${JSON.stringify(medicines)}
-      Return a JSON array of medicine IDs. Only return valid IDs from the list.
-      If none match, return an empty array.
-      Output purely JSON, like ["id1", "id2"]. Do not wrap in markdown blocks.`;
+      
+      Return a JSON array of objects, where each object has the following keys:
+      - "medicine_id": the id of the medicine from the provided list, or null if it cannot be determined.
+      - "medicine_name": the name of the medicine.
+      - "dosage": the dosage mentioned (or null if not mentioned).
+      - "action": either "taken" or "skipped".
+      
+      If none match or cannot be parsed, return an empty array [].
+      Output purely JSON. Do not wrap in markdown blocks.`;
       
       const response = await ai.models.generateContent({
           model: 'gemini-2.5-flash',
@@ -511,56 +484,19 @@ router.post('/voice-log-audio', upload.single('audio'), async (req, res) => {
       });
       
       const parsedText = response.text.trim().replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '');
-      let medicineIds = [];
+      let parsedData = [];
       try {
-        medicineIds = JSON.parse(parsedText);
+        parsedData = JSON.parse(parsedText);
       } catch(e) {
         console.error('Failed to parse AI response:', parsedText);
         return res.status(400).json({ error: 'Could not parse response from AI' });
       }
 
-      if (!Array.isArray(medicineIds) || medicineIds.length === 0) {
+      if (!Array.isArray(parsedData) || parsedData.length === 0) {
          return res.status(400).json({ error: 'Could not match any medicines from voice' });
       }
 
-      const logs = [];
-      for (const medicine_id of medicineIds) {
-        const med = await supabase.from('medicines').select('circle_id, name, stock_quantity, refill_alert_threshold').eq('id', medicine_id).single();
-        
-        if (med.data && String(med.data.circle_id) === String(userCircleId)) {
-          logs.push({
-            medicine_id,
-            circle_id: userCircleId,
-            status: 'taken',
-            taken_at: new Date().toISOString(),
-            logged_by: user_id
-          });
-          
-          let currentStock = med.data.stock_quantity || 0;
-          if (currentStock > 0) {
-            currentStock -= 1;
-            await supabase.from('medicines').update({ stock_quantity: currentStock }).eq('id', medicine_id);
-            
-            const threshold = med.data.refill_alert_threshold || 5;
-            if (currentStock === threshold) {
-              await supabase.from('notifications').insert([{
-                circle_id: userCircleId,
-                type: 'REFILL_ALERT',
-                priority: 'high',
-                context: { medicine_name: med.data.name, remaining: currentStock },
-                title: `Refill Alert: ${med.data.name}`,
-                body: `Only ${currentStock} doses remaining for ${med.data.name}.`
-              }]);
-            }
-          }
-        }
-      }
-
-      if (logs.length > 0) {
-        await supabase.from('medicine_dose_logs').insert(logs);
-      }
-
-      res.status(200).json({ message: 'Voice log processed successfully', logged: logs.map(l => l.medicine_id) });
+      res.status(200).json({ message: 'Voice log parsed successfully', parsedData });
 
     } catch (error) {
       console.error('Voice log error:', error);

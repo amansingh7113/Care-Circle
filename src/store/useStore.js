@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginEmail, registerEmail } from '../services/authApi';
 import { getMedicineAnalytics } from '../services/medicineApi';
+import { supabase } from '../services/supabase';
 import { jwtDecode } from 'jwt-decode';
 
 export const useStore = create(
@@ -10,6 +11,7 @@ export const useStore = create(
     (set) => ({
       userSession: null,
       user: null,
+      appLanguage: null, // Stores user's selected language
       currentCircle: null,
       medicinesList: [],
       dailyTasks: [],
@@ -23,7 +25,10 @@ export const useStore = create(
       notifications: [],
       unreadNotificationCount: 0,
       pendingSyncQueue: [],
+      lastHeartbeat: null,
+      activeSubscription: null,
 
+      setAppLanguage: (langCode) => set({ appLanguage: langCode }),
       setSession: (session) => {
         let decodedUser = null;
         if (session) {
@@ -49,6 +54,37 @@ export const useStore = create(
       removePendingSync: (id) => set((state) => ({ pendingSyncQueue: state.pendingSyncQueue.filter(m => m.id !== id) })),
       flushPendingSync: async () => {
         // Implementation logic handled externally or skipped for MVP
+      },
+      subscribeToCircle: (circleId) => {
+        if (!circleId) return;
+        set((state) => {
+          if (state.activeSubscription) {
+            supabase.removeChannel(state.activeSubscription);
+          }
+          return { activeSubscription: null };
+        });
+        
+        const channel = supabase.channel(`circle_heartbeat_${circleId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `circle_id=eq.${circleId}` }, (payload) => {
+            set({ lastHeartbeat: Date.now() });
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'medicines', filter: `circle_id=eq.${circleId}` }, (payload) => {
+            set({ lastHeartbeat: Date.now() });
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'blood_pressure_logs', filter: `circle_id=eq.${circleId}` }, (payload) => {
+            set({ lastHeartbeat: Date.now() });
+          })
+          .subscribe();
+          
+        set({ activeSubscription: channel });
+      },
+      unsubscribeFromCircle: () => {
+        set((state) => {
+          if (state.activeSubscription) {
+            supabase.removeChannel(state.activeSubscription);
+          }
+          return { activeSubscription: null };
+        });
       },
       loginWithEmail: async (email, password) => {
         set({ emailAuthLoading: true, emailAuthError: null });
@@ -105,6 +141,7 @@ export const useStore = create(
       partialize: (state) => ({
         userSession: state.userSession,
         user: state.user,
+        appLanguage: state.appLanguage,
         currentCircle: state.currentCircle,
         pendingSyncQueue: state.pendingSyncQueue,
         bloodPressureLogs: state.bloodPressureLogs,

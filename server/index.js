@@ -33,10 +33,14 @@ const doctorVisitsRouter = require('./routes/doctorVisits');
 const expensesRouter = require('./routes/expenses');
 const vitalsRouter = require('./routes/vitals');
 const sleepRouter = require('./routes/sleep');
+const hydrationRouter = require('./routes/hydration');
 const stepsRouter = require('./routes/steps');
 const documentsRouter = require('./routes/documents');
 const insightsRouter = require('./routes/insights');
 const notificationsRouter = require('./routes/notifications');
+const exportRouter = require('./routes/export');
+const paymentsRouter = require('./routes/payments');
+
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/circles', circlesRouter);
 app.use('/api/v1/users', usersRouter);
@@ -46,10 +50,13 @@ app.use('/api/v1/doctor-visits', doctorVisitsRouter);
 app.use('/api/v1/expenses', expensesRouter);
 app.use('/api/v1/vitals', vitalsRouter);
 app.use('/api/v1/sleep', sleepRouter);
+app.use('/api/v1/hydration', hydrationRouter);
 app.use('/api/v1/steps', stepsRouter);
 app.use('/api/v1/documents', documentsRouter);
 app.use('/api/v1/insights', insightsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
+app.use('/api/v1/export', exportRouter);
+app.use('/api/v1/payments', paymentsRouter);
 
 app.get('/api/v1/dashboard', authenticate, async (req, res) => {
   try {
@@ -59,9 +66,9 @@ app.get('/api/v1/dashboard', authenticate, async (req, res) => {
     const [vitals, sleep, steps, medicines, tasks] = await Promise.all([
       supabase.from('blood_pressure_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('sleep_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
-      supabase.from('step_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
+      supabase.from('step_logs').select('*').eq('circle_id', circle_id).order('date', { ascending: false }).limit(5),
       supabase.from('medicines').select('*').eq('circle_id', circle_id).eq('is_archived', false),
-      supabase.from('tasks').select('*').eq('circle_id', circle_id)
+      supabase.from('tasks').select('*, assignee:users(name)').eq('circle_id', circle_id)
     ]);
 
     res.status(200).json({
@@ -82,11 +89,13 @@ app.get('/api/v1/dashboard', authenticate, async (req, res) => {
 const runMigrations = require('./db/migrate');
 
 const { startCron } = require('./cron/missedDoseCron');
+const { startInsightsCron } = require('./cron/insightsProcessor');
 
 async function startServer() {
   await runMigrations();
   
   startCron();
+  startInsightsCron();
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`CareCircle server listening on port ${port} (IPv4)`);

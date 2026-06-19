@@ -14,9 +14,11 @@ import {
   Platform,
 } from 'react-native';
 import { getDoctorVisits, addDoctorVisit, deleteDoctorVisit, updateDoctorVisit } from '../../services/doctorVisitApi';
+import { uploadEncryptedFile } from '../../services/documentsApi';
+import { getDoctorSummary } from '../../services/insightsApi';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import { supabase } from '../../services/supabase';
+import AdBanner from '../../components/AdBanner';
 
 const PRIMARY_BLUE = '#1A73E8';
 const TOUCH_TARGET_SIZE = 48;
@@ -26,6 +28,9 @@ const DoctorVisitsScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingVisitId, setEditingVisitId] = useState(null);
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
+  const [generatingSummary, setGeneratingSummary] = useState(false);
 
   // Form State
   const [doctorName, setDoctorName] = useState('');
@@ -42,7 +47,7 @@ const DoctorVisitsScreen = ({ navigation }) => {
     try {
       setLoading(true);
       const data = await getDoctorVisits();
-      setVisits(data.data || []);
+      setVisits(data || []);
     } catch (error) {
       console.error('Error fetching doctor visits:', error);
     } finally {
@@ -64,6 +69,21 @@ const DoctorVisitsScreen = ({ navigation }) => {
     } catch (err) {
       console.error('Error picking document:', err);
       Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
+  const handleGenerateSummary = async () => {
+    try {
+      setGeneratingSummary(true);
+      setSummaryModalVisible(true);
+      const data = await getDoctorSummary();
+      setAiSummary(data.summary);
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      Alert.alert('Error', 'Failed to generate summary');
+      setSummaryModalVisible(false);
+    } finally {
+      setGeneratingSummary(false);
     }
   };
 
@@ -95,24 +115,8 @@ const DoctorVisitsScreen = ({ navigation }) => {
 
       const attachment_urls = [];
       for (const file of attachments) {
-        const formData = new FormData();
-        formData.append('file', {
-          uri: file.uri,
-          name: file.name,
-          type: file.mimeType || 'application/octet-stream'
-        });
-        
-        const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-        const { data, error } = await supabase.storage
-          .from('documents')
-          .upload(fileName, formData);
-          
-        if (data) {
-           const { data: publicData } = supabase.storage.from('documents').getPublicUrl(fileName);
-           attachment_urls.push(publicData.publicUrl);
-        } else if (error) {
-           console.error('Upload error:', error);
-        }
+        const uploadResult = await uploadEncryptedFile(file.uri, file.name, file.mimeType);
+        attachment_urls.push(uploadResult.url);
       }
 
       const visitPayload = {
@@ -248,12 +252,20 @@ const DoctorVisitsScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Doctor Visits</Text>
-        <TouchableOpacity
-          style={styles.addIconBtn}
-          onPress={openAddModal}
-        >
-          <Text style={styles.addIconText}>+</Text>
-        </TouchableOpacity>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <TouchableOpacity
+            style={styles.summaryBtn}
+            onPress={handleGenerateSummary}
+          >
+            <Text style={styles.summaryBtnText}>✨ AI Summary</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addIconBtn}
+            onPress={openAddModal}
+          >
+            <Text style={styles.addIconText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -340,6 +352,41 @@ const DoctorVisitsScreen = ({ navigation }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* AI Summary Modal */}
+      <Modal
+        visible={summaryModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSummaryModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>✨ Doctor Visit Briefing</Text>
+            <TouchableOpacity
+              style={styles.closeBtn}
+              onPress={() => setSummaryModalVisible(false)}
+            >
+              <Text style={styles.closeBtnText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{flex: 1, padding: 20}}>
+            {generatingSummary ? (
+              <View style={styles.center}>
+                <ActivityIndicator size="large" color={PRIMARY_BLUE} />
+                <Text style={{marginTop: 10, color: '#64748B'}}>Analyzing 30-day telemetry...</Text>
+              </View>
+            ) : (
+              <FlatList 
+                data={[{key: '1'}]}
+                renderItem={() => <Text style={{fontSize: 16, lineHeight: 24, color: '#334155'}}>{aiSummary}</Text>}
+              />
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      <AdBanner />
     </SafeAreaView>
   );
 };
@@ -374,11 +421,22 @@ const styles = StyleSheet.create({
     minWidth: TOUCH_TARGET_SIZE,
     justifyContent: 'center',
     alignItems: 'flex-end',
+    marginLeft: 12,
   },
   addIconText: {
     fontSize: 28,
     color: PRIMARY_BLUE,
     fontWeight: '400',
+  },
+  summaryBtn: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  summaryBtnText: {
+    color: '#4F46E5',
+    fontWeight: '600',
   },
   listContent: {
     padding: 20,

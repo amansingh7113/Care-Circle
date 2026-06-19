@@ -13,6 +13,7 @@ import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
 import VoiceLogButton from '../components/VoiceLogButton';
+import AdBanner from '../components/AdBanner';
 
 const MedicineDashboardScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -260,7 +261,8 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
 
     } catch (error) {
       console.log('Failed to save medicine', error);
-      Alert.alert('Error', 'Failed to save medicine. Please try again.');
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to save medicine';
+      Alert.alert('Error', errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -302,6 +304,11 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
                 <Text style={styles.freqBadgeText}>{freqLabel}</Text>
               </View>
             </View>
+            {item.stock_quantity !== undefined && (
+              <Text style={[styles.medDetails, { marginTop: 4, color: item.stock_quantity <= (item.refill_alert_threshold || 5) ? THEME.colors.alert : THEME.colors.textMuted }]}>
+                Inventory: {item.stock_quantity} remaining
+              </Text>
+            )}
             {item.shape && <Text style={styles.medDetails}>Shape {item.shape}</Text>}
           </View>
         </View>

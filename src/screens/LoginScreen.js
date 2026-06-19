@@ -7,11 +7,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../services/supabase';
+import { Modal } from 'react-native';
+import { changeLanguage } from '../i18n';
 
 // Ensure the browser closes when returning to the app
 WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = ({ navigation }) => {
+  const appLanguage = useStore(state => state.appLanguage);
+  const [langModalVisible, setLangModalVisible] = useState(false);
+
+  React.useEffect(() => {
+    if (!appLanguage) {
+      setLangModalVisible(true);
+    }
+  }, [appLanguage]);
+
+  const handleSelectLanguage = (code) => {
+    Haptics.selectionAsync();
+    changeLanguage(code);
+    setLangModalVisible(false);
+  };
   const [authMode, setAuthMode] = useState('phone'); // 'phone', 'email-login', 'email-register'
   
   const [phone, setPhone] = useState('');
@@ -274,6 +290,38 @@ const LoginScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={langModalVisible} transparent={true} animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Choose Language / भाषा चुनें</Text>
+            <Text style={styles.modalBody}>
+              Please select your preferred language. You can change this later in settings.
+            </Text>
+            <ScrollView style={{ maxHeight: 300, width: '100%', marginBottom: 16 }}>
+              {[
+                { code: 'en', label: 'English' },
+                { code: 'hi', label: 'हिन्दी (Hindi)' },
+                { code: 'bn', label: 'বাংলা (Bengali)' },
+                { code: 'ta', label: 'தமிழ் (Tamil)' },
+                { code: 'te', label: 'తెలుగు (Telugu)' },
+                { code: 'mr', label: 'मराठी (Marathi)' },
+                { code: 'gu', label: 'ગુજરાતી (Gujarati)' },
+                { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' }
+              ].map(lang => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={styles.langOptionBtn}
+                  onPress={() => handleSelectLanguage(lang.code)}
+                >
+                  <Text style={styles.langOptionText}>{lang.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 };
@@ -363,6 +411,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#fff', padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24, alignItems: 'center' },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 8 },
+  modalBody: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
+  langOptionBtn: { padding: 16, width: '100%', borderBottomWidth: 1, borderBottomColor: '#eee', alignItems: 'center' },
+  langOptionText: { fontSize: 16, color: '#1A73E8', fontWeight: '500' }
 });
 
 export default LoginScreen;

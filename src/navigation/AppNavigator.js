@@ -21,6 +21,8 @@ import EditProfileScreen from '../screens/settings/EditProfileScreen';
 import ManageCircleScreen from '../screens/settings/ManageCircleScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import StepHistoryScreen from '../screens/home/StepHistoryScreen';
+import ExportReportScreen from '../screens/settings/ExportReportScreen';
+import PremiumUpgradeScreen from '../screens/settings/PremiumUpgradeScreen';
 
 const Stack = createStackNavigator();
 
@@ -40,6 +42,7 @@ const AppNavigator = () => {
         <>
           <Stack.Screen name="Dashboard" component={PatientDashboardScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="ExportReport" component={ExportReportScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </>
       ) : (
@@ -51,6 +54,8 @@ const AppNavigator = () => {
           <Stack.Screen name="TaskBoard" component={TaskBoardScreen} />
           <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen name="PremiumUpgrade" component={PremiumUpgradeScreen} />
+          <Stack.Screen name="ExportReport" component={ExportReportScreen} />
           <Stack.Screen name="Documents" component={DocumentsScreen} />
           <Stack.Screen name="DoctorVisits" component={DoctorVisitsScreen} />
           <Stack.Screen name="AttachmentViewer" component={AttachmentViewerScreen} />

@@ -17,6 +17,7 @@ import {
 import { getExpensesSummary, addExpense, deleteExpense, updateExpense, updateBudget } from '../../services/expenseApi';
 import { useStore } from '../../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
+import AdBanner from '../../components/AdBanner';
 
 const ExpensesScreen = () => {
   const [loading, setLoading] = useState(true);
@@ -294,6 +295,7 @@ const ExpensesScreen = () => {
         </KeyboardAvoidingView>
       </Modal>
 
+      <AdBanner />
     </SafeAreaView>
   );
 };

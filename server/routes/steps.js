@@ -40,18 +40,19 @@ router.get('/:circleId', async (req, res) => {
 // 2. Sync (upsert) step count for today
 router.post('/', async (req, res) => {
   const { circle_id, date, step_count } = req.body;
+  const patient_id = req.user.id;
 
   if (!circle_id || !date || step_count === undefined) {
     return res.status(400).json({ error: 'Missing required fields: circle_id, date, step_count' });
   }
 
   try {
-    // Upsert the step count for the specific circle and date
+    // Upsert the step count for the specific circle, patient, and date
     const { data: log, error } = await supabase
       .from('step_logs')
       .upsert(
-        { circle_id, date, step_count, updated_at: new Date().toISOString() },
-        { onConflict: 'circle_id, date' }
+        { circle_id, patient_id, date, step_count },
+        { onConflict: 'circle_id, patient_id, date' }
       )
       .select()
       .single();

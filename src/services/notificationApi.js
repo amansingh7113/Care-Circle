@@ -22,4 +22,9 @@ export const savePushToken = async (token) => {
   return response.data;
 };
 
-export default { getNotifications, markAsRead, markAllAsRead, savePushToken };
+export const triggerSos = async () => {
+  const response = await notificationApi.post('/sos');
+  return response.data;
+};
+
+export default { getNotifications, markAsRead, markAllAsRead, savePushToken, triggerSos };

@@ -63,7 +63,22 @@ router.get('/', async (req, res) => {
       .order('visit_date', { ascending: false });
 
     if (error) throw error;
-    res.status(200).json({ data });
+
+    // Dynamically append authorization token to attachment_urls for decryption
+    const authHeader = req.headers.authorization;
+    const token = authHeader ? authHeader.split(' ')[1] : '';
+
+    const formattedData = (data || []).map(visit => {
+      const urls = (visit.attachment_urls || []).map(url => {
+        if (url && url.includes('/decrypt') && token) {
+          return `${url}&token=${token}`;
+        }
+        return url;
+      });
+      return { ...visit, attachment_urls: urls };
+    });
+
+    res.status(200).json({ data: formattedData });
   } catch (err) {
     console.error('Get doctor visits error:', err);
     res.status(500).json({ error: err.message });

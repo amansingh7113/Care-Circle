@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 
   const { data: userRecords, error } = await supabase
     .from('users')
-    .select('circle_id, role, circles(id, name)')
+    .select('circle_id, role, circles(id, name, is_premium)')
     .eq('id', user_id);
 
   if (error) {
@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
   const circles = userRecords.filter(r => r.circles).map(record => ({
     id: record.circles.id,
     name: record.circles.name,
+    is_premium: record.circles.is_premium,
     role: record.role
   }));
 

@@ -128,4 +128,29 @@ router.post('/push-token', async (req, res) => {
   }
 });
 
+// POST /sos - Trigger an emergency alert
+router.post('/sos', async (req, res) => {
+  try {
+    const circleId = req.user.circle_id;
+    const patientName = req.user.name || 'A Patient';
+
+    const { error } = await supabaseAdmin
+      .from('notifications')
+      .insert([{
+        circle_id: circleId,
+        type: 'SOS',
+        priority: 'high',
+        title: `🚨 EMERGENCY: ${patientName}`,
+        body: `${patientName} has triggered the SOS panic button. Immediate assistance required.`,
+        context: { is_sos: true, triggered_by: req.user.id }
+      }]);
+
+    if (error) throw error;
+    res.json({ message: 'SOS alert sent successfully' });
+  } catch (err) {
+    console.error('Error sending SOS:', err);
+    res.status(500).json({ error: 'Failed to send SOS' });
+  }
+});
+
 module.exports = router;

@@ -10,4 +10,9 @@ export const generateInsights = async (prescriptionId, forceRefresh = false) => 
   return response.data;
 };
 
-export default { generateInsights };
+export const getDoctorSummary = async () => {
+  const response = await insightsApi.get('/doctor-summary');
+  return response.data; // { summary: "markdown..." }
+};
+
+export default { generateInsights, getDoctorSummary };

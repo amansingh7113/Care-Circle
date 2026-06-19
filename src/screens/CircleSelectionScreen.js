@@ -12,6 +12,7 @@ import { useStore } from '../store/useStore';
 import { THEME } from '../styles/theme';
 
 const CircleSelectionScreen = ({ navigation }) => {
+  const user = useStore(state => state.user);
   const [circles, setCircles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -110,7 +111,7 @@ const CircleSelectionScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={{flexGrow: 1}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.topSection}>
-        <Text style={styles.welcomeText}>WELCOME, USER</Text>
+        <Text style={styles.welcomeText}>WELCOME, {user?.name?.toUpperCase() || 'USER'}</Text>
         {/* Placeholder for top vector graphic */}
         <View style={styles.graphicPlaceholder}>
           <Users size={80} color={THEME.colors.alert} />

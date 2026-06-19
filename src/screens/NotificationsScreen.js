@@ -7,6 +7,7 @@ import { useStore } from '../store/useStore';
 import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import { THEME } from '../styles/theme';
+import AdBanner from '../components/AdBanner';
 
 const NotificationsScreen = () => {
   const navigation = useNavigation();
@@ -113,9 +114,9 @@ const NotificationsScreen = () => {
         </View>
       ) : notifications.length === 0 ? (
         <EmptyState 
-          icon={Bell}
-          title="No Notifications"
-          message="You're all caught up! We'll notify you when there's an update."
+          iconName="notifications-outline"
+          titleText="No Notifications"
+          subtitleText="You're all caught up! We'll notify you when there's an update."
         />
       ) : (
         <FlatList
@@ -126,6 +127,8 @@ const NotificationsScreen = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.primary} />}
         />
       )}
+
+      <AdBanner />
     </View>
   );
 };

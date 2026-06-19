@@ -1,4 +1,5 @@
 import 'react-native-gesture-handler';
+import './src/i18n';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';

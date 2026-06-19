@@ -9,10 +9,16 @@ import { getSleepLogs } from '../services/sleepApi';
 import { getMedicines, logAdministration } from '../services/medicineApi';
 import { getVitals } from '../services/vitalsApi';
 import { getSteps } from '../services/stepApi';
-import { getDashboardAggregated } from '../services/dashboardApi';
+import { getDoctorVisits } from '../services/doctorVisitApi';
+import { getTodayHydration, logHydration } from '../services/hydrationApi';
 import { THEME } from '../styles/theme';
 import CircularProgressRing from '../components/CircularProgressRing';
 import { useStore } from '../store/useStore';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { generatePdfTemplate } from '../utils/pdfTemplate';
+import LogBloodPressureModal from './home/LogBloodPressureModal';
+import AdBanner from '../components/AdBanner';
 
 const vitalsConfig = [
   { id: '1', label: 'Blood Pressure', value: '--/--', icon: '❤️', color: THEME.colors.alert },
@@ -27,9 +33,13 @@ const DashboardScreen = ({ route, navigation }) => {
   const [medicines, setMedicines] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { bloodPressureLogs, sleepLogs, stepLogs, setBloodPressureLogs, setSleepLogs, setStepLogs, user } = useStore();
+  const [bpModalVisible, setBpModalVisible] = useState(false);
+  const { bloodPressureLogs, sleepLogs, stepLogs, setBloodPressureLogs, setSleepLogs, setStepLogs, user, subscribeToCircle, unsubscribeFromCircle, lastHeartbeat } = useStore();
   const [refreshing, setRefreshing] = useState(false);
   const [loggingMedId, setLoggingMedId] = useState(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [hydrationMl, setHydrationMl] = useState(0);
+  const [loggingWater, setLoggingWater] = useState(false);
   
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const holdProgress = useRef(new Animated.Value(0)).current;
@@ -118,25 +128,38 @@ const DashboardScreen = ({ route, navigation }) => {
         fetchCircleData();
       } else {
         setIsLoading(false);
-        setMembers([
-          { id: 1, name: 'Aman', role: 'Admin' },
-          { id: 2, name: 'Anshika', role: 'Member' },
-          { id: 3, name: 'Rahul', role: 'Member' }
-        ]);
+        setMembers([]);
       }
     }, [circleId])
   );
+
+  useEffect(() => {
+    if (circleId) {
+      subscribeToCircle(circleId);
+    }
+    return () => {
+      unsubscribeFromCircle();
+    };
+  }, [circleId]);
+
+  useEffect(() => {
+    if (lastHeartbeat) {
+      fetchCircleData();
+    }
+  }, [lastHeartbeat]);
 
   const fetchCircleData = useCallback(async () => {
     setIsLoading(true);
     try {
       // Run API calls in parallel for better performance
-      const [circleData, dashboardData] = await Promise.all([
+      const [circleData, dashboardData, hydrationData] = await Promise.all([
         getCircleDetails(circleId).catch(() => ({ members: [] })),
-        getDashboardAggregated(circleId).catch(() => ({ vitals: [], sleep: [], steps: [], medicines: [], tasks: [] }))
+        getDashboardAggregated(circleId).catch(() => ({ vitals: [], sleep: [], steps: [], medicines: [], tasks: [] })),
+        getTodayHydration().catch(() => ({ total_ml: 0 }))
       ]);
       
       setMembers(circleData?.members || []);
+      setHydrationMl(hydrationData?.total_ml || 0);
       setSleepLogs(Array.isArray(dashboardData?.sleep) ? dashboardData.sleep : []);
       setBloodPressureLogs(Array.isArray(dashboardData?.vitals) ? dashboardData.vitals : []);
       setMedicines(dashboardData?.medicines || (Array.isArray(dashboardData?.medicines) ? dashboardData.medicines : []));
@@ -184,11 +207,71 @@ const DashboardScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleLogWater = async () => {
+    if (loggingWater) return;
+    setLoggingWater(true);
+    try {
+      const data = await logHydration(250);
+      setHydrationMl(data.total_ml);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to log water');
+    } finally {
+      setLoggingWater(false);
+    }
+  };
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchCircleData();
     setRefreshing(false);
   }, [circleId, fetchCircleData]);
+
+  const handleShareMedicalReport = async () => {
+    if (isGeneratingPdf) return;
+    setIsGeneratingPdf(true);
+    try {
+      let visits = [];
+      try {
+        visits = await getDoctorVisits(circleId);
+      } catch (e) {
+        console.warn('Failed to fetch doctor visits', e);
+      }
+
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const recentVisits = visits.filter(v => new Date(v.visit_date || v.created_at) >= thirtyDaysAgo);
+      const recentVitals = bloodPressureLogs.filter(v => new Date(v.created_at || v.timestamp) >= thirtyDaysAgo);
+
+      const htmlContent = generatePdfTemplate({
+        patientName: circleName,
+        vitals: recentVitals,
+        medicines: medicines,
+        doctorVisits: recentVisits,
+        generatedDate: new Date().toLocaleString()
+      });
+
+      const { uri } = await Print.printToFileAsync({
+        html: htmlContent,
+        base64: false
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Share Medical Report',
+          UTI: 'com.adobe.pdf'
+        });
+      } else {
+        Alert.alert('Sharing Unavailable', 'Sharing is not supported on this device.');
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      Alert.alert('Error', 'Failed to generate medical report.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   return (
     <View style={styles.safeArea}>
@@ -262,6 +345,26 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         )}
 
+        {/* Module: Hydration Tracker */}
+        <View style={styles.hydrationSection}>
+          <View style={styles.hydrationCard}>
+            <View style={{flex: 1}}>
+              <Text style={styles.hydrationTitle}>Daily Hydration</Text>
+              <Text style={styles.hydrationValue}>{hydrationMl} <Text style={{fontSize: 16, color: THEME.colors.textBody}}>out of 2000 ml</Text></Text>
+              <View style={[styles.vitalBarContainer, { backgroundColor: '#E0F2FE', marginTop: 8 }]}>
+                <View style={[styles.vitalBarFill, { backgroundColor: '#0EA5E9', width: `${Math.min(100, (hydrationMl/2000)*100)}%` }]} />
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.waterButton} 
+              onPress={handleLogWater}
+              disabled={loggingWater}
+            >
+              {loggingWater ? <ActivityIndicator color="#FFF" /> : <Text style={styles.waterButtonText}>+ 250ml 💧</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Module B: Wellness Vitals Quick-Grid */}
         <View style={styles.vitalsSection}>
           <Text style={styles.sectionTitle}>Vitals</Text>
@@ -298,7 +401,7 @@ const DashboardScreen = ({ route, navigation }) => {
                   key={vital.id} 
                   style={styles.vitalCard}
                   onPress={() => {
-                    if (isBP) navigation.navigate('BloodPressureHistory');
+                    if (isBP) setBpModalVisible(true);
                     if (isMedication) navigation.navigate('MedicineTracker');
                     if (isSleep) {
                       navigation.navigate('SleepDetails');
@@ -395,6 +498,22 @@ const DashboardScreen = ({ route, navigation }) => {
               <Text style={styles.buttonText}>Documents Hub</Text>
             </TouchableOpacity>
             <View style={[styles.shortcutButton, { backgroundColor: 'transparent', elevation: 0 }]} />
+          </View>
+          <View style={[styles.shortcutsRow, { marginTop: 12 }]}>
+            <TouchableOpacity 
+              style={[styles.shortcutButton, { backgroundColor: THEME.colors.primary, width: '100%', flexDirection: 'row', justifyContent: 'center' }]}
+              onPress={handleShareMedicalReport}
+              disabled={isGeneratingPdf}
+            >
+              {isGeneratingPdf ? (
+                <ActivityIndicator color={THEME.colors.white} />
+              ) : (
+                <>
+                  <Text style={{ fontSize: 16, marginRight: 8 }}>📄</Text>
+                  <Text style={styles.buttonText}>Share Medical Report (PDF)</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
         
@@ -511,6 +630,30 @@ const styles = StyleSheet.create({
   },
   logButtonDisabled: { opacity: 0.7 },
   logButtonText: { color: THEME.colors.primary, fontWeight: '800', fontSize: 14 },
+
+  // Hydration Styles
+  hydrationSection: { marginBottom: 24 },
+  hydrationCard: {
+    backgroundColor: THEME.colors.white,
+    padding: 20,
+    borderRadius: THEME.borderRadius.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...THEME.shadows.soft,
+    borderWidth: 1,
+    borderColor: '#E0F2FE'
+  },
+  hydrationTitle: { color: '#0EA5E9', fontWeight: '700', marginBottom: 4 },
+  hydrationValue: { fontSize: 24, fontWeight: '800', color: THEME.colors.textHeader },
+  waterButton: {
+    backgroundColor: '#0EA5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginLeft: 16
+  },
+  waterButtonText: { color: THEME.colors.white, fontWeight: 'bold' },
   
   // Vitals Grid Styles
   vitalsSection: { marginBottom: 28 },

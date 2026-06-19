@@ -1,23 +1,18 @@
 import { useEffect, useRef } from 'react';
-import { Accelerometer } from 'expo-sensors';
 import { AppState } from 'react-native';
 import { useStore } from '../store/useStore';
 import { addSleepLog } from '../services/sleepApi';
+import {
+  initialize,
+  requestPermission,
+  readRecords,
+} from 'react-native-health-connect';
 
 export default function SleepTrackerService() {
   const currentCircle = useStore(state => state.currentCircle);
   const user = useStore(state => state.user);
   
-  const subscriptionRef = useRef(null);
-  const isSleepingRef = useRef(false);
-  const sleepStartTimeRef = useRef(null);
-  const stillnessTimerRef = useRef(null);
-
-  // Constants to define "stillness"
-  const STILLNESS_THRESHOLD = 0.05; // Change in G-force
-  const TIME_TO_FALL_ASLEEP = 30 * 60 * 1000; // 30 mins of stillness = asleep
-  
-  let lastVector = { x: 0, y: 0, z: 0 };
+  const syncedSessionsRef = useRef(new Set());
 
   useEffect(() => {
     let isMounted = true;
@@ -27,67 +22,76 @@ export default function SleepTrackerService() {
       return;
     }
 
-    const startTracking = async () => {
+    const initAndFetch = async () => {
       try {
-        const isAvailable = await Accelerometer.isAvailableAsync();
-        if (!isAvailable || !isMounted) return;
+        const isInitialized = await initialize();
+        if (!isInitialized) return;
 
-        Accelerometer.setUpdateInterval(5000); // Check every 5 seconds to save battery
-        
-        subscriptionRef.current = Accelerometer.addListener(result => {
-          const deltaX = Math.abs(result.x - lastVector.x);
-          const deltaY = Math.abs(result.y - lastVector.y);
-          const deltaZ = Math.abs(result.z - lastVector.z);
-          
-          lastVector = { x: result.x, y: result.y, z: result.z };
+        // Request permissions
+        await requestPermission([
+          { accessType: 'read', recordType: 'SleepSession' },
+        ]);
 
-          const isMoving = (deltaX > STILLNESS_THRESHOLD || deltaY > STILLNESS_THRESHOLD || deltaZ > STILLNESS_THRESHOLD);
-
-          if (isMoving) {
-            // User moved
-            if (isSleepingRef.current) {
-               // Woke up
-               isSleepingRef.current = false;
-               const duration = (Date.now() - sleepStartTimeRef.current) / (1000 * 60); // minutes
-               if (duration > 60) { // Log if slept for more than an hour
-                 logSleep(duration);
-               }
-               sleepStartTimeRef.current = null;
-            } else {
-               // Reset the stillness timer
-               if (stillnessTimerRef.current) clearTimeout(stillnessTimerRef.current);
-               stillnessTimerRef.current = setTimeout(() => {
-                 // After 30 mins of no movement, consider asleep
-                 isSleepingRef.current = true;
-                 sleepStartTimeRef.current = Date.now() - TIME_TO_FALL_ASLEEP;
-               }, TIME_TO_FALL_ASLEEP);
-            }
-          }
-        });
-
+        fetchSleepFromHealthConnect();
       } catch (error) {
-        console.error('Failed to initialize sleep tracker:', error);
+        console.error('Failed to initialize Health Connect (Sleep):', error);
       }
     };
 
-    startTracking();
+    const fetchSleepFromHealthConnect = async () => {
+      try {
+        const now = new Date();
+        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        const result = await readRecords('SleepSession', {
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: yesterday.toISOString(),
+            endTime: now.toISOString(),
+          },
+        });
+
+        if (result?.records && result.records.length > 0) {
+          // Process records to sync latest
+          // We assume we want to sync any recent sleep sessions
+          for (const session of result.records) {
+            const start = new Date(session.startTime);
+            const end = new Date(session.endTime);
+            const durationMinutes = (end - start) / (1000 * 60);
+
+            // Avoid syncing extremely short sessions or if we already synced recently
+            // In a real app we would check backend if this exact session is synced
+            if (durationMinutes > 60) {
+              await logSleep(start.toISOString(), end.toISOString(), durationMinutes);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Could not fetch sleep from Health Connect:", e);
+      }
+    };
+
+    initAndFetch();
+
+    // Fetch periodically while active
+    const intervalId = setInterval(fetchSleepFromHealthConnect, 5 * 60000); // Check every 5 minutes
 
     return () => {
       isMounted = false;
-      if (subscriptionRef.current) {
-        subscriptionRef.current.remove();
-        subscriptionRef.current = null;
-      }
-      if (stillnessTimerRef.current) clearTimeout(stillnessTimerRef.current);
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [user?.role]);
 
-  const logSleep = async (durationMinutes) => {
+  const logSleep = async (sleepStart, sleepEnd, durationMinutes) => {
     if (!currentCircle) return;
+    
+    // Check if this exact session has already been synced in this lifecycle
+    const sessionKey = `${sleepStart}_${sleepEnd}`;
+    if (syncedSessionsRef.current.has(sessionKey)) {
+      return;
+    }
+
     try {
-      const sleepEnd = new Date().toISOString();
-      const sleepStart = new Date(Date.now() - durationMinutes * 60000).toISOString();
-      
       await addSleepLog({
         circle_id: currentCircle.id,
         sleep_start: sleepStart,
@@ -95,21 +99,17 @@ export default function SleepTrackerService() {
         duration_minutes: Math.round(durationMinutes),
         is_auto_detected: true
       });
-      console.log(`Synced ${durationMinutes} mins of sleep`);
+      syncedSessionsRef.current.add(sessionKey);
+      console.log(`Synced ${Math.round(durationMinutes)} mins of sleep from Health Connect`);
     } catch (error) {
       console.error('Failed to sync sleep log:', error);
     }
   };
 
-  // Sync to backend on app backgrounding if they woke up and we haven't synced
+  // Sync to backend on app backgrounding
   useEffect(() => {
     const handleAppStateChange = async (nextAppState) => {
-      if (
-        nextAppState.match(/inactive|background/) && 
-        currentCircle
-      ) {
-         // Optionally persist sleep state to storage so it survives app kill
-      }
+      // Logic for background handling if needed
     };
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);

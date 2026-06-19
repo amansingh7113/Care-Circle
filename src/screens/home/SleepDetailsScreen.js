@@ -88,9 +88,9 @@ const SleepDetailsScreen = ({ navigation }) => {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <EmptyState 
-              icon="moon" 
-              title="No sleep data" 
-              message="Sleep data will be automatically logged and appear here." 
+              iconName="moon" 
+              titleText="No sleep data" 
+              subtitleText="Sleep data will be automatically logged and appear here." 
             />
           }
         />

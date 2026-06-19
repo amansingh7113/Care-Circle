@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView, SafeAreaView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getTasks, updateTaskStatus, deleteTask } from '../services/taskApi';
 import { useStore } from '../store/useStore';
@@ -8,9 +8,11 @@ import { THEME } from '../styles/theme';
 import SkeletonLoader from '../components/SkeletonLoader';
 import EmptyState from '../components/EmptyState';
 import { Ionicons } from '@expo/vector-icons';
+import AdBanner from '../components/AdBanner';
 
 const TaskBoardScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
+  const lastHeartbeat = useStore(state => state.lastHeartbeat);
   const circleId = route.params?.circleId || currentCircle?.id;
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -21,6 +23,12 @@ const TaskBoardScreen = ({ route, navigation }) => {
       fetchTasks();
     }, [circleId, activeTab])
   );
+
+  React.useEffect(() => {
+    if (lastHeartbeat) {
+      fetchTasks();
+    }
+  }, [lastHeartbeat]);
 
   const fetchTasks = async () => {
     if (!circleId) {
@@ -89,9 +97,9 @@ const TaskBoardScreen = ({ route, navigation }) => {
           <Text style={styles.taskTitle}>{item.title}</Text>
           <View style={styles.taskMetaRow}>
             <View style={styles.assigneeAvatar}>
-              <Text style={styles.assigneeInitial}>{item.assigned_to ? item.assigned_to.charAt(0).toUpperCase() : 'U'}</Text>
+              <Text style={styles.assigneeInitial}>{item.assignee?.name ? item.assignee.name.charAt(0).toUpperCase() : 'U'}</Text>
             </View>
-            <Text style={styles.taskDetails}>Due: {item.due_date || 'N/A'} - {item.assigned_to || 'Unassigned'}</Text>
+            <Text style={styles.taskDetails}>Due: {item.due_date || 'N/A'} - {item.assignee?.name || 'Unassigned'}</Text>
           </View>
         </View>
         <View style={styles.actions}>
@@ -136,7 +144,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -187,7 +195,9 @@ const TaskBoardScreen = ({ route, navigation }) => {
             <Text style={{fontSize: 50}}>👩🏽‍⚕️🧑🏻‍⚕️👨🏾‍⚕️</Text>
          </View>
       </View>
-    </View>
+
+      <AdBanner />
+    </SafeAreaView>
   );
 };
 

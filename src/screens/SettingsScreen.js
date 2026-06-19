@@ -7,8 +7,13 @@ import { THEME } from '../styles/theme';
 import axios from 'axios';
 import { API_BASE_URL } from '../services/apiConfig';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '../i18n';
+import AdBanner from '../components/AdBanner';
 
 const SettingsScreen = ({ navigation }) => {
+  const { t, i18n } = useTranslation();
+  const currentCircle = useStore(state => state.currentCircle);
   const user = useStore(state => state.user);
   const clearSession = useStore(state => state.clearSession);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
@@ -53,12 +58,12 @@ const SettingsScreen = ({ navigation }) => {
     await Clipboard.setStringAsync(inviteCode);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     
-    setToastMessage('Code copied to clipboard!');
+    setToastMessage(t('settings.codeCopied'));
     setTimeout(() => setToastMessage(''), 3000);
     
     try {
       await Share.share({
-        message: `Join my Care Circle on CareCircle! Use code: ${inviteCode}`
+        message: `${t('settings.joinMyCircle')} ${inviteCode}`
       });
     } catch (error) {
       console.error('Share failed', error);
@@ -69,9 +74,7 @@ const SettingsScreen = ({ navigation }) => {
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       if (clearSession) clearSession();
-      // Wait a tick for Zustand to clear state, which triggers RootNavigator to show Login/AuthStack
-      // Or we can manually reset
-      Alert.alert('Logged Out', 'You have been successfully logged out.');
+      Alert.alert(t('settings.loggedOutTitle'), t('settings.loggedOutBody'));
     } catch (error) {
       console.error(error);
     }
@@ -88,7 +91,7 @@ const SettingsScreen = ({ navigation }) => {
       
       if (response.data.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+        Alert.alert(t('settings.accountDeletedTitle'), t('settings.accountDeletedBody'));
         if (clearSession) clearSession();
         navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       } else {
@@ -96,7 +99,7 @@ const SettingsScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to delete account. Please try again.');
+      Alert.alert(t('settings.error'), t('settings.deleteFailed'));
     } finally {
       setDeleteModalVisible(false);
     }
@@ -113,27 +116,75 @@ const SettingsScreen = ({ navigation }) => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={THEME.colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.header}>Settings</Text>
+        <Text style={styles.header}>{t('settings.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Premium Upgrade Banner */}
+        {!currentCircle?.is_premium && (
+          <TouchableOpacity 
+            style={[styles.rowButton, { backgroundColor: THEME.colors.primary, borderColor: THEME.colors.primary, marginBottom: 24 }]} 
+            onPress={() => navigation.navigate('PremiumUpgrade')}
+          >
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+              <Text style={{fontSize: 20, marginRight: 8}}>👑</Text>
+              <Text style={[styles.rowButtonText, { color: THEME.colors.white, fontSize: 16 }]}>Upgrade to Premium</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* Language Selection */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('settings.preferences')}</Text>
+          <View style={styles.languageRow}>
+            <Text style={styles.languageLabel}>{t('settings.language')}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.langPills}>
+              {[
+                { code: 'en', label: 'English' },
+                { code: 'hi', label: 'हिन्दी' },
+                { code: 'bn', label: 'বাংলা' },
+                { code: 'ta', label: 'தமிழ்' },
+                { code: 'te', label: 'తెలుగు' },
+                { code: 'mr', label: 'मराठी' },
+                { code: 'gu', label: 'ગુજરાતી' },
+                { code: 'kn', label: 'ಕನ್ನಡ' }
+              ].map(lang => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[styles.langPill, i18n.language === lang.code && styles.langPillActive]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    changeLanguage(lang.code);
+                  }}
+                >
+                  <Text style={[styles.langPillText, i18n.language === lang.code && styles.langPillTextActive]}>{lang.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+
         {/* Invite Member Component */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Invite to Circle</Text>
+          <Text style={styles.sectionTitle}>{t('settings.invite')}</Text>
           <View style={styles.inviteCard}>
             <Text style={styles.inviteDescription}>
-              Share this unique code with family members or caregivers to grant them secure access to this Care Circle.
+              {t('settings.inviteDesc')}
             </Text>
             
             <View style={styles.roleSelector}>
-              {['Patient', 'Caregiver', 'Viewer'].map((role) => (
+              {[
+                { key: 'Caregiver', label: t('settings.roleCaregiver') },
+                { key: 'Patient', label: t('settings.rolePatient') },
+                { key: 'Viewer', label: t('settings.roleViewer') }
+              ].map((roleObj) => (
                 <TouchableOpacity 
-                  key={role}
-                  style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
-                  onPress={() => setInviteRole(role)}
+                  key={roleObj.key}
+                  style={[styles.rolePill, inviteRole === roleObj.key && styles.rolePillActive]}
+                  onPress={() => setInviteRole(roleObj.key)}
                 >
-                  <Text style={[styles.rolePillText, inviteRole === role && styles.rolePillTextActive]}>{role}</Text>
+                  <Text style={[styles.rolePillText, inviteRole === roleObj.key && styles.rolePillTextActive]}>{roleObj.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -148,34 +199,37 @@ const SettingsScreen = ({ navigation }) => {
             
             <TouchableOpacity style={styles.shareButton} onPress={handleCopyShare} disabled={isLoadingCode}>
               <Ionicons name="share-social-outline" size={20} color={THEME.colors.cardBg} />
-              <Text style={styles.shareButtonText}>Copy & Share</Text>
+              <Text style={styles.shareButtonText}>{t('settings.copyShare')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal & Compliance</Text>
+          <Text style={styles.sectionTitle}>{t('settings.legal')}</Text>
           <TouchableOpacity style={styles.rowButton} onPress={() => openLegal('privacy')}>
-            <Text style={styles.rowButtonText}>Privacy Policy</Text>
+            <Text style={styles.rowButtonText}>{t('settings.privacy')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.rowButton} onPress={() => openLegal('terms')}>
-            <Text style={styles.rowButtonText}>Terms of Service</Text>
+            <Text style={styles.rowButtonText}>{t('settings.terms')}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Management</Text>
+          <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
           <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('EditProfile')}>
-            <Text style={styles.rowButtonText}>Edit Profile</Text>
+            <Text style={styles.rowButtonText}>{t('settings.editProfile')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('ManageCircle')}>
-            <Text style={styles.rowButtonText}>Manage Circle</Text>
+            <Text style={styles.rowButtonText}>{t('settings.manageCircle')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.rowButton} onPress={() => navigation.navigate('ExportReport')}>
+            <Text style={styles.rowButtonText}>{t('settings.exportReport')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.rowButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Log Out</Text>
+            <Text style={styles.logoutButtonText}>{t('settings.logout')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={[styles.rowButton, styles.deleteButton]} onPress={() => setDeleteModalVisible(true)}>
-            <Text style={styles.deleteButtonText}>Delete Account</Text>
+            <Text style={styles.deleteButtonText}>{t('settings.deleteAccount')}</Text>
           </TouchableOpacity>
         </View>
         <View style={{ height: 40 }} />
@@ -192,16 +246,16 @@ const SettingsScreen = ({ navigation }) => {
       <Modal visible={deleteModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Delete Account?</Text>
+            <Text style={styles.modalTitle}>{t('settings.deleteModalTitle')}</Text>
             <Text style={styles.modalBody}>
-              This action is permanent and cannot be undone. All your Care Circle data, medicine logs, and tasks will be erased.
+              {t('settings.deleteModalBody')}
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setDeleteModalVisible(false)}>
-                <Text style={styles.cancelBtnText}>Cancel</Text>
+                <Text style={styles.cancelBtnText}>{t('settings.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.confirmDeleteBtn} onPress={handleDeleteAccount}>
-                <Text style={styles.confirmDeleteBtnText}>Delete Permanently</Text>
+                <Text style={styles.confirmDeleteBtnText}>{t('settings.deletePermanently')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -211,7 +265,7 @@ const SettingsScreen = ({ navigation }) => {
       {/* Legal Modal */}
       <Modal visible={legalModalVisible} animationType="slide">
         <View style={styles.legalModalContainer}>
-          <Text style={styles.legalModalTitle}>{legalType === 'privacy' ? 'Privacy Policy' : 'Terms of Service'}</Text>
+          <Text style={styles.legalModalTitle}>{legalType === 'privacy' ? t('settings.privacy') : t('settings.terms')}</Text>
           <ScrollView style={styles.legalScrollView}>
             <Text style={styles.legalText}>
               {legalType === 'privacy' 
@@ -220,10 +274,12 @@ const SettingsScreen = ({ navigation }) => {
             </Text>
           </ScrollView>
           <TouchableOpacity style={styles.closeLegalBtn} onPress={() => setLegalModalVisible(false)}>
-            <Text style={styles.closeLegalBtnText}>Close</Text>
+            <Text style={styles.closeLegalBtnText}>{t('settings.close')}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
+
+      <AdBanner />
     </View>
   );
 };

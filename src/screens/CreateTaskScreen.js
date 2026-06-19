@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { createTask, updateTask } from '../services/taskApi';
 import { useStore } from '../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../styles/theme';
+import { createApiClient } from '../services/apiConfig';
 
 const CreateTaskScreen = ({ route, navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
@@ -15,7 +16,29 @@ const CreateTaskScreen = ({ route, navigation }) => {
   const [description, setDescription] = useState(taskToEdit?.description || '');
   const [category, setCategory] = useState(taskToEdit?.category || '');
   const [dueDate, setDueDate] = useState(taskToEdit?.dueDate || taskToEdit?.due_date || '');
-  const [assignee, setAssignee] = useState(taskToEdit?.assignee || taskToEdit?.assigned_to || '');
+  
+  // Store the UUID of the selected member
+  const [assigneeId, setAssigneeId] = useState(taskToEdit?.assigned_to || '');
+
+  const [members, setMembers] = useState([]);
+  const [isFetchingMembers, setIsFetchingMembers] = useState(false);
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!circleId) return;
+      try {
+        setIsFetchingMembers(true);
+        const circleClient = createApiClient('/api/v1/circles');
+        const response = await circleClient.get(`/${circleId}`);
+        setMembers(response.data.members || []);
+      } catch (err) {
+        console.error('Failed to fetch circle members', err);
+      } finally {
+        setIsFetchingMembers(false);
+      }
+    };
+    fetchMembers();
+  }, [circleId]);
 
   const handleSave = async () => {
     if (!title || !dueDate) {
@@ -23,7 +46,15 @@ const CreateTaskScreen = ({ route, navigation }) => {
     }
 
     try {
-      const payload = { title, description, category: category || 'General', due_date: dueDate, assigned_to: assignee, status: taskToEdit?.status || 'pending' };
+      const payload = { 
+        title, 
+        description, 
+        category: category || 'General', 
+        due_date: dueDate, 
+        assigned_to: assigneeId || null, 
+        status: taskToEdit?.status || 'pending' 
+      };
+      
       if (isEditing) {
         await updateTask(taskToEdit.id, payload);
         Alert.alert('Success', 'Task updated successfully');
@@ -35,6 +66,36 @@ const CreateTaskScreen = ({ route, navigation }) => {
     } catch (error) {
       Alert.alert('Error', isEditing ? 'Failed to update task' : 'Failed to create task');
     }
+  };
+
+  const renderAssigneeSelector = () => {
+    if (isFetchingMembers) {
+      return <ActivityIndicator size="small" color={THEME.colors.primary} style={{ alignSelf: 'flex-start' }} />;
+    }
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.memberSelectorContainer}>
+        <TouchableOpacity
+          style={[styles.memberChip, !assigneeId && styles.memberChipSelected]}
+          onPress={() => setAssigneeId('')}
+        >
+          <Text style={[styles.memberChipText, !assigneeId && styles.memberChipTextSelected]}>Unassigned</Text>
+        </TouchableOpacity>
+        {members.map(member => {
+          const isSelected = assigneeId === member.id;
+          return (
+            <TouchableOpacity
+              key={member.id}
+              style={[styles.memberChip, isSelected && styles.memberChipSelected]}
+              onPress={() => setAssigneeId(member.id)}
+            >
+              <Text style={[styles.memberChipText, isSelected && styles.memberChipTextSelected]}>
+                {member.name}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    );
   };
 
   return (
@@ -71,8 +132,8 @@ const CreateTaskScreen = ({ route, navigation }) => {
         </View>
 
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Assignee (Optional)</Text>
-          <TextInput style={styles.input} value={assignee} onChangeText={setAssignee} placeholder="e.g. User ID or Name" />
+          <Text style={styles.label}>Assignee</Text>
+          {renderAssigneeSelector()}
         </View>
 
         <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
@@ -93,7 +154,35 @@ const styles = StyleSheet.create({
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#ddd', padding: 14, borderRadius: 8, fontSize: 16 },
   textArea: { height: 100, textAlignVertical: 'top' },
   submitBtn: { backgroundColor: '#1A73E8', padding: 16, borderRadius: 8, alignItems: 'center', marginTop: 24, marginBottom: 40 },
-  submitBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' }
+  submitBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  memberSelectorContainer: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    gap: 8,
+  },
+  memberChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#E2E8F0',
+    borderWidth: 1,
+    borderColor: '#CBD5E0',
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberChipSelected: {
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
+  },
+  memberChipText: {
+    color: '#4A5568',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  memberChipTextSelected: {
+    color: '#FFF',
+  },
 });
 
 export default CreateTaskScreen;

@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
-import { useStore } from '../../store/useStore';
 import { getMedicines, logAdministration } from '../../services/medicineApi';
+import { triggerSos } from '../../services/notificationApi';
+import { getTodayHydration, logHydration } from '../../services/hydrationApi';
 import { THEME } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../components/EmptyState';
@@ -14,6 +15,8 @@ const PatientDashboardScreen = ({ navigation }) => {
   const [medicines, setMedicines] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loggingId, setLoggingId] = useState(null);
+  const [hydrationMl, setHydrationMl] = useState(0);
+  const [loggingWater, setLoggingWater] = useState(false);
 
   useEffect(() => {
     fetchPendingMedicines();
@@ -24,9 +27,9 @@ const PatientDashboardScreen = ({ navigation }) => {
     try {
       setLoading(true);
       const data = await getMedicines(currentCircle.id);
-      // Filter for medicines that need to be taken today
-      // For simplicity in MVP, we show all active medicines that are not marked 'taken' for their next slot
-      // Or we just show all medicines and let them log. Let's show active ones.
+      const hydrationData = await getTodayHydration().catch(() => ({ total_ml: 0 }));
+      setHydrationMl(hydrationData?.total_ml || 0);
+
       const activeMeds = data.filter(m => m.status !== 'archived');
       setMedicines(activeMeds);
     } catch (error) {
@@ -54,6 +57,41 @@ const PatientDashboardScreen = ({ navigation }) => {
       Alert.alert('Error', `Failed to mark medicine as ${status}`);
     } finally {
       setLoggingId(null);
+    }
+  };
+
+  const handleSos = () => {
+    Alert.alert(
+      'EMERGENCY SOS',
+      'This will instantly alert all your caregivers. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'SEND SOS', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await triggerSos();
+              Alert.alert('SOS Sent', 'Your caregivers have been notified.');
+            } catch (err) {
+              Alert.alert('Error', 'Failed to send SOS. Please call emergency services.');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleLogWater = async () => {
+    if (loggingWater) return;
+    setLoggingWater(true);
+    try {
+      const data = await logHydration(250);
+      setHydrationMl(data.total_ml);
+    } catch (e) {
+      Alert.alert('Error', 'Failed to log water');
+    } finally {
+      setLoggingWater(false);
     }
   };
 
@@ -101,10 +139,20 @@ const PatientDashboardScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
-        <Text style={styles.headerGreeting}>Hi, {user?.name || 'Patient'}</Text>
-        <Text style={styles.headerSubtitle}>Here are your medicines for today</Text>
-        <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
-            <Ionicons name="settings-outline" size={24} color={THEME.colors.primary} />
+        <View style={styles.headerTopRow}>
+          <View>
+            <Text style={styles.headerGreeting}>Hi, {user?.name || 'Patient'}</Text>
+            <Text style={styles.headerSubtitle}>Here are your medicines for today</Text>
+          </View>
+          <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
+              <Ionicons name="settings-outline" size={24} color={THEME.colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* SOS Button */}
+        <TouchableOpacity style={styles.sosButton} onPress={handleSos}>
+          <Ionicons name="alert-circle-outline" size={24} color={THEME.colors.white} />
+          <Text style={styles.sosText}>EMERGENCY SOS</Text>
         </TouchableOpacity>
       </View>
 
@@ -117,6 +165,24 @@ const PatientDashboardScreen = ({ navigation }) => {
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderItem}
             contentContainerStyle={styles.listContent}
+            ListHeaderComponent={
+              <View style={styles.hydrationCard}>
+                <View style={{flex: 1}}>
+                  <Text style={styles.hydrationTitle}>Daily Water Goal</Text>
+                  <Text style={styles.hydrationValue}>{hydrationMl} <Text style={{fontSize: 16, color: THEME.colors.textBody}}>out of 2000 ml</Text></Text>
+                  <View style={[styles.vitalBarContainer, { backgroundColor: '#E0F2FE', marginTop: 8 }]}>
+                    <View style={[styles.vitalBarFill, { backgroundColor: '#0EA5E9', width: `${Math.min(100, (hydrationMl/2000)*100)}%` }]} />
+                  </View>
+                </View>
+                <TouchableOpacity 
+                  style={styles.waterButton} 
+                  onPress={handleLogWater}
+                  disabled={loggingWater}
+                >
+                  {loggingWater ? <ActivityIndicator color="#FFF" /> : <Text style={styles.waterButtonText}>+ 250ml 💧</Text>}
+                </TouchableOpacity>
+              </View>
+            }
             ListEmptyComponent={
               <EmptyState 
                 iconName="medkit" 
@@ -137,7 +203,19 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingTop: 40, backgroundColor: THEME.colors.white, ...THEME.shadows.soft, marginBottom: 10 },
   headerGreeting: { ...THEME.typography.header, fontSize: 28, color: THEME.colors.primary, marginBottom: 4 },
   headerSubtitle: { ...THEME.typography.body, color: THEME.colors.textMuted },
-  settingsIcon: { position: 'absolute', right: 20, top: 45, padding: 8 },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  settingsIcon: { padding: 4 },
+  sosButton: { 
+    flexDirection: 'row', 
+    backgroundColor: THEME.colors.danger, 
+    marginTop: 20, 
+    paddingVertical: 14, 
+    borderRadius: 12, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    ...THEME.shadows.medium 
+  },
+  sosText: { color: THEME.colors.white, fontSize: 18, fontWeight: '800', marginLeft: 8, letterSpacing: 1 },
   container: { flex: 1 },
   listContent: { padding: 16 },
   card: { backgroundColor: THEME.colors.white, padding: 20, marginVertical: 10, borderRadius: 16, ...THEME.shadows.medium },
@@ -151,7 +229,33 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.6 },
   takenButton: { backgroundColor: THEME.colors.primary },
   skipButton: { backgroundColor: THEME.colors.danger },
-  buttonText: { color: THEME.colors.white, fontSize: 16, fontWeight: 'bold', letterSpacing: 1 }
+  buttonText: { color: THEME.colors.white, fontSize: 16, fontWeight: 'bold', letterSpacing: 1 },
+
+  // Hydration Styles
+  hydrationCard: {
+    backgroundColor: THEME.colors.white,
+    padding: 20,
+    borderRadius: THEME.borderRadius.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    ...THEME.shadows.soft,
+    borderWidth: 1,
+    borderColor: '#E0F2FE',
+    marginBottom: 20
+  },
+  hydrationTitle: { color: '#0EA5E9', fontWeight: '700', marginBottom: 4 },
+  hydrationValue: { fontSize: 24, fontWeight: '800', color: THEME.colors.textHeader },
+  waterButton: {
+    backgroundColor: '#0EA5E9',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginLeft: 16
+  },
+  waterButtonText: { color: THEME.colors.white, fontWeight: 'bold', fontSize: 16 },
+  vitalBarContainer: { height: 8, borderRadius: 4, width: '100%' },
+  vitalBarFill: { height: '100%', borderRadius: 4 }
 });
 
 export default PatientDashboardScreen;

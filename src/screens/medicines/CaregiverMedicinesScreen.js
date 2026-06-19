@@ -111,7 +111,12 @@ const CaregiverMedicinesScreen = () => {
         <Text>Dosage: {item.dosage}</Text>
         <Text>Frequency: {instructions.frequency || 'Daily'}</Text>
         <Text>Times: {instructions.scheduled_times?.join(', ') || item.scheduled_time || 'Not set'}</Text>
-        <Text>Stock: {item.stock_quantity ?? 'N/A'}</Text>
+        <Text style={[
+          styles.stockText, 
+          (item.stock_quantity !== null && item.stock_quantity <= (item.refill_alert_threshold || 5)) ? styles.lowStock : null
+        ]}>
+          Stock: {item.stock_quantity ?? 'N/A'} {item.stock_quantity !== null && item.stock_quantity <= (item.refill_alert_threshold || 5) && '(Low)'}
+        </Text>
       </View>
     );
   };
@@ -159,6 +164,8 @@ const styles = StyleSheet.create({
   listContent: { paddingBottom: 24 },
   card: { backgroundColor: '#fff', padding: 16, marginVertical: 8, borderRadius: 8, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 4, elevation: 2 },
   title: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
+  stockText: { marginTop: 4, fontWeight: '500' },
+  lowStock: { color: 'red', fontWeight: 'bold' },
   emptyText: { textAlign: 'center', marginTop: 40, fontSize: 16, color: '#999' },
   modalContainer: { flex: 1, padding: 16, justifyContent: 'center' },
   modalTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 16, textAlign: 'center' },
