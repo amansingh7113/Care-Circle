@@ -295,8 +295,6 @@ const styles = StyleSheet.create({
   errorText: { color: '#fff', flex: 1, fontSize: 13, fontWeight: '600' }
 });
 
-});
-
 export default function WrappedVoiceLogButton(props) {
   return (
     <ErrorBoundary>

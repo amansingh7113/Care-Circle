@@ -14,16 +14,22 @@ import {
   Platform,
 } from 'react-native';
 import { getDoctorVisits, addDoctorVisit, deleteDoctorVisit, updateDoctorVisit } from '../../services/doctorVisitApi';
-import { uploadEncryptedFile } from '../../services/documentsApi';
+import { uploadEncryptedFile, addDocumentMetadata } from '../../services/documentsApi';
 import { getDoctorSummary } from '../../services/insightsApi';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import AdBanner from '../../components/AdBanner';
+import { useStore } from '../../store/useStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const PRIMARY_BLUE = '#1A73E8';
 const TOUCH_TARGET_SIZE = 48;
 
 const DoctorVisitsScreen = ({ navigation }) => {
+  const { user, currentCircle } = useStore();
+  const circleId = currentCircle?.id || user?.circle_id;
+  const insets = useSafeAreaInsets();
+
   const [visits, setVisits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -40,13 +46,15 @@ const DoctorVisitsScreen = ({ navigation }) => {
   const [attachments, setAttachments] = useState([]);
 
   useEffect(() => {
-    fetchVisits();
-  }, []);
+    if (circleId) {
+      fetchVisits();
+    }
+  }, [circleId]);
 
   const fetchVisits = async () => {
     try {
       setLoading(true);
-      const data = await getDoctorVisits();
+      const data = await getDoctorVisits(circleId);
       setVisits(data || []);
     } catch (error) {
       console.error('Error fetching doctor visits:', error);
@@ -76,7 +84,7 @@ const DoctorVisitsScreen = ({ navigation }) => {
     try {
       setGeneratingSummary(true);
       setSummaryModalVisible(true);
-      const data = await getDoctorSummary();
+      const data = await getDoctorSummary(circleId);
       setAiSummary(data.summary);
     } catch (error) {
       console.error('Error generating summary:', error);
@@ -114,9 +122,14 @@ const DoctorVisitsScreen = ({ navigation }) => {
       setLoading(true);
 
       const attachment_urls = [];
+      const uploadedDocs = [];
       for (const file of attachments) {
         const uploadResult = await uploadEncryptedFile(file.uri, file.name, file.mimeType);
         attachment_urls.push(uploadResult.url);
+        uploadedDocs.push({
+          name: file.name,
+          url: uploadResult.url,
+        });
       }
 
       const visitPayload = {
@@ -124,8 +137,10 @@ const DoctorVisitsScreen = ({ navigation }) => {
         visit_date: visitDate,
         reason,
         notes,
+        circle_id: circleId,
       };
 
+      let savedVisitId = editingVisitId;
       if (editingVisitId) {
         const existingVisit = visits.find(v => v.id === editingVisitId);
         if (existingVisit && existingVisit.attachment_urls) {
@@ -136,7 +151,26 @@ const DoctorVisitsScreen = ({ navigation }) => {
         await updateDoctorVisit(editingVisitId, visitPayload);
       } else {
         visitPayload.attachment_urls = attachment_urls;
-        await addDoctorVisit(visitPayload);
+        const newVisit = await addDoctorVisit(visitPayload);
+        if (newVisit && newVisit.data && newVisit.data.id) {
+          savedVisitId = newVisit.data.id;
+        }
+      }
+
+      // Register new attachments in Document Hub under 'Reports' category
+      for (const doc of uploadedDocs) {
+        try {
+          await addDocumentMetadata({
+            circle_id: circleId,
+            uploaded_by: user?.id,
+            title: doc.name || 'Doctor Visit Attachment',
+            category: 'Reports',
+            file_url: doc.url,
+            visit_id: savedVisitId || null,
+          });
+        } catch (docErr) {
+          console.warn('Failed to add document metadata:', docErr);
+        }
       }
 
       setModalVisible(false);
@@ -219,11 +253,11 @@ const DoctorVisitsScreen = ({ navigation }) => {
         <View style={styles.cardHeader}>
           <Text style={styles.doctorName}>{item.doctor_name}</Text>
           <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <TouchableOpacity onPress={() => openEditModal(item)} style={{padding: 4, marginRight: 8}}>
-              <Ionicons name="pencil" size={16} color={PRIMARY_BLUE} />
+            <TouchableOpacity onPress={() => openEditModal(item)} style={{minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginRight: 4}}>
+              <Ionicons name="pencil" size={20} color={PRIMARY_BLUE} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => handleDeleteVisit(item.id)} style={{padding: 4}}>
-              <Ionicons name="trash-outline" size={16} color="#E53935" />
+            <TouchableOpacity onPress={() => handleDeleteVisit(item.id)} style={{minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center'}}>
+              <Ionicons name="trash-outline" size={20} color="#E53935" />
             </TouchableOpacity>
           </View>
         </View>
@@ -249,9 +283,14 @@ const DoctorVisitsScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Doctor Visits</Text>
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 16 }]}>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={24} color={PRIMARY_BLUE} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Doctor Visits</Text>
+        </View>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <TouchableOpacity
             style={styles.summaryBtn}
@@ -292,7 +331,7 @@ const DoctorVisitsScreen = ({ navigation }) => {
         onRequestClose={() => setModalVisible(false)}
       >
         <KeyboardAvoidingView 
-          style={styles.modalContainer}
+          style={[styles.modalContainer, { paddingTop: Platform.OS === 'android' ? Math.max(insets.top, 20) : 0 }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.modalHeader}>
@@ -360,7 +399,7 @@ const DoctorVisitsScreen = ({ navigation }) => {
         presentationStyle="pageSheet"
         onRequestClose={() => setSummaryModalVisible(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { paddingTop: Platform.OS === 'android' ? Math.max(insets.top, 20) : 0 }]}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>✨ Doctor Visit Briefing</Text>
             <TouchableOpacity
@@ -383,11 +422,11 @@ const DoctorVisitsScreen = ({ navigation }) => {
               />
             )}
           </View>
-        </SafeAreaView>
+        </View>
       </Modal>
 
       <AdBanner />
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -416,6 +455,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
   },
+  backBtn: {
+    minHeight: TOUCH_TARGET_SIZE,
+    minWidth: TOUCH_TARGET_SIZE,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    marginRight: 8,
+  },
   addIconBtn: {
     minHeight: TOUCH_TARGET_SIZE,
     minWidth: TOUCH_TARGET_SIZE,
@@ -433,6 +479,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
+    minHeight: TOUCH_TARGET_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   summaryBtnText: {
     color: '#4F46E5',
@@ -440,6 +489,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 20,
+    paddingBottom: 100,
   },
   emptyText: {
     textAlign: 'center',

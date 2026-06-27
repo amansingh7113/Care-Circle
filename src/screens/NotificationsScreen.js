@@ -103,7 +103,7 @@ const NotificationsScreen = () => {
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <TouchableOpacity onPress={handleMarkAllRead} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity style={styles.markReadButton} onPress={handleMarkAllRead} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <CheckCircle size={22} color="#fff" />
         </TouchableOpacity>
       </View>
@@ -144,10 +144,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingHorizontal: 20,
   },
-  backButton: { padding: 4 },
+  backButton: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'flex-start' },
+  markReadButton: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'flex-end' },
   headerTitle: { ...THEME.typography.h2, color: '#fff' },
   loadingContainer: { padding: 20 },
-  listContent: { padding: 16, paddingBottom: 40 },
+  listContent: { padding: 16, paddingBottom: 100 },
   notificationCard: {
     flexDirection: 'row',
     backgroundColor: THEME.colors.cardBg,

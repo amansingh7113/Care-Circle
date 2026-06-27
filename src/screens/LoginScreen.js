@@ -9,6 +9,8 @@ import * as Haptics from 'expo-haptics';
 import { supabase } from '../services/supabase';
 import { Modal } from 'react-native';
 import { changeLanguage } from '../i18n';
+import { THEME } from '../styles/theme';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Ensure the browser closes when returning to the app
 WebBrowser.maybeCompleteAuthSession();
@@ -132,8 +134,8 @@ const LoginScreen = ({ navigation }) => {
     setGoogleLoading(true);
     console.log('Initiating Google Login...');
     try {
-      const redirectUri = 'carecircle://auth';
-      console.log('Using static Redirect URI:', redirectUri);
+      const redirectUri = Linking.createURL('auth');
+      console.log('Using dynamic Redirect URI:', redirectUri);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -210,15 +212,17 @@ const LoginScreen = ({ navigation }) => {
             />
             
             <TouchableOpacity 
-              style={styles.button} 
               onPress={handleSendOtp}
               disabled={loading}
+              activeOpacity={0.8}
             >
+              <LinearGradient colors={THEME.gradients.primary} style={styles.button} start={{x: 0, y: 0}} end={{x: 1, y: 1}}>
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={THEME.colors.white} />
               ) : (
                 <Text style={styles.buttonText}>Send Verification Code</Text>
               )}
+              </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.switchModeButton} onPress={() => setAuthMode('email-login')}>
@@ -246,15 +250,17 @@ const LoginScreen = ({ navigation }) => {
             />
 
             <TouchableOpacity 
-              style={styles.button} 
               onPress={handleEmailAuth}
               disabled={emailAuthLoading}
+              activeOpacity={0.8}
             >
+              <LinearGradient colors={THEME.gradients.primary} style={styles.button} start={{x: 0, y: 0}} end={{x: 1, y: 1}}>
               {emailAuthLoading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={THEME.colors.white} />
               ) : (
                 <Text style={styles.buttonText}>{authMode === 'email-login' ? 'Sign In' : 'Sign Up'}</Text>
               )}
+              </LinearGradient>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -331,38 +337,37 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.colors.canvas,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    ...THEME.typography.header,
     marginBottom: 8,
-    color: '#333',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
+    ...THEME.typography.body,
+    color: THEME.colors.textMuted,
     marginBottom: 32,
   },
   input: {
-    height: 50,
+    height: 56,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.borderRadius.button,
     paddingHorizontal: 16,
     fontSize: 16,
     marginBottom: 16,
-    backgroundColor: '#fdfdfd',
-    color: '#333',
+    backgroundColor: THEME.colors.cardBg,
+    color: THEME.colors.textBody,
+    ...THEME.shadows.soft,
   },
   button: {
-    backgroundColor: '#1A73E8', // Google Blue as per PRD constraints
-    height: 50,
-    borderRadius: 12,
+    height: 56,
+    borderRadius: THEME.borderRadius.button,
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 48, // 48dp constraint
     marginTop: 8,
+    ...THEME.shadows.medium,
   },
   buttonText: {
     color: '#fff',
@@ -377,9 +382,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   switchModeText: {
-    color: '#1A73E8',
+    color: THEME.colors.primary,
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   dividerContainer: {
     flexDirection: 'row',
@@ -389,22 +394,23 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#eee',
+    backgroundColor: THEME.colors.border,
   },
   dividerText: {
     marginHorizontal: 16,
-    color: '#999',
+    color: THEME.colors.textMuted,
     fontWeight: '500',
   },
   googleButton: {
-    backgroundColor: '#fff',
-    height: 50,
+    backgroundColor: THEME.colors.cardBg,
+    height: 56,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.borderRadius.button,
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 48,
+    ...THEME.shadows.soft,
   },
   googleButtonText: {
     color: '#333',

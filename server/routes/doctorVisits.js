@@ -8,6 +8,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember, assertCircleRole } = require('../middleware/authorizer');
 router.use(authenticate);
 
 // POST /api/v1/doctor-visits
@@ -19,8 +20,22 @@ router.post('/', async (req, res) => {
     if (!targetCircleId) {
       return res.status(403).json({ error: 'Unauthorized: User is not part of any circle' });
     }
-    if (circle_id && circle_id !== req.user.circle_id) {
-      return res.status(403).json({ error: 'Unauthorized to add visits to this circle' });
+
+    try {
+      assertCircleRole(req, targetCircleId, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized to add visits to this circle: Requires Admin or Caregiver role' });
+    }
+
+    const clean_attachment_urls = (attachment_urls || []).map(url => url.split('&token=')[0]);
+    
+    // Extract storage_path from first attachment url if present (CC-004)
+    let storage_path = null;
+    if (clean_attachment_urls.length > 0) {
+      try {
+        const urlObj = new URL(clean_attachment_urls[0]);
+        storage_path = urlObj.searchParams.get('path');
+      } catch (e) {}
     }
 
     const { data, error } = await supabase
@@ -30,7 +45,8 @@ router.post('/', async (req, res) => {
         visit_date, 
         reason, 
         notes, 
-        attachment_urls,
+        attachment_urls: clean_attachment_urls,
+        storage_path,
         circle_id: targetCircleId
       }])
       .select();
@@ -52,8 +68,10 @@ router.get('/', async (req, res) => {
        return res.status(403).json({ error: 'User is not part of any circle' });
     }
     
-    if (req.query.circle_id && req.query.circle_id !== req.user.circle_id) {
-        return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    try {
+      assertCircleMember(req, circle_id);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
     }
 
     const { data, error } = await supabase
@@ -64,21 +82,7 @@ router.get('/', async (req, res) => {
 
     if (error) throw error;
 
-    // Dynamically append authorization token to attachment_urls for decryption
-    const authHeader = req.headers.authorization;
-    const token = authHeader ? authHeader.split(' ')[1] : '';
-
-    const formattedData = (data || []).map(visit => {
-      const urls = (visit.attachment_urls || []).map(url => {
-        if (url && url.includes('/decrypt') && token) {
-          return `${url}&token=${token}`;
-        }
-        return url;
-      });
-      return { ...visit, attachment_urls: urls };
-    });
-
-    res.status(200).json({ data: formattedData });
+    res.status(200).json({ data: data || [] });
   } catch (err) {
     console.error('Get doctor visits error:', err);
     res.status(500).json({ error: err.message });
@@ -89,11 +93,10 @@ router.get('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const visitId = req.params.id;
-    const userCircleId = req.user.circle_id;
 
     const { data: visit, error: visitError } = await supabase
       .from('doctor_visits')
-      .select('circle_id')
+      .select('circle_id, attachment_urls, storage_path')
       .eq('id', visitId)
       .single();
 
@@ -101,8 +104,31 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Doctor visit not found' });
     }
 
-    if (String(visit.circle_id) !== String(userCircleId)) {
-      return res.status(403).json({ error: 'Unauthorized access to this visit' });
+    try {
+      assertCircleRole(req, visit.circle_id, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to delete this visit: Requires Admin or Caregiver role' });
+    }
+
+    // Try to delete associated files from Supabase storage using server storage_path (CC-004)
+    const storagePaths = [];
+    if (visit.storage_path) {
+      storagePaths.push(visit.storage_path);
+    } else if (visit.attachment_urls && visit.attachment_urls.length > 0) {
+      for (const url of visit.attachment_urls) {
+        try {
+          const urlObj = new URL(url);
+          const filePath = urlObj.searchParams.get('path');
+          if (filePath) storagePaths.push(filePath);
+        } catch (parseErr) {
+          console.warn('Failed to parse attachment url for deletion [REDACTED]');
+        }
+      }
+    }
+
+    if (storagePaths.length > 0) {
+      await supabase.storage.from('documents').remove(storagePaths);
+      console.log('Removed doctor visit attachments from storage [REDACTED]');
     }
 
     const { error } = await supabase
@@ -122,7 +148,6 @@ router.delete('/:id', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const visitId = req.params.id;
-    const userCircleId = req.user.circle_id;
     const { doctor_name, visit_date, reason, notes, attachment_urls } = req.body;
 
     // Verify visit belongs to the user's circle
@@ -136,8 +161,10 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Doctor visit not found' });
     }
 
-    if (String(visit.circle_id) !== String(userCircleId)) {
-      return res.status(403).json({ error: 'Unauthorized access to this visit' });
+    try {
+      assertCircleRole(req, visit.circle_id, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to update this visit: Requires Admin or Caregiver role' });
     }
 
     const updateData = {};
@@ -145,7 +172,15 @@ router.patch('/:id', async (req, res) => {
     if (visit_date !== undefined) updateData.visit_date = visit_date;
     if (reason !== undefined) updateData.reason = reason;
     if (notes !== undefined) updateData.notes = notes;
-    if (attachment_urls !== undefined) updateData.attachment_urls = attachment_urls;
+    if (attachment_urls !== undefined) {
+      updateData.attachment_urls = (attachment_urls || []).map(url => url.split('&token=')[0]);
+      if (updateData.attachment_urls.length > 0) {
+        try {
+          const urlObj = new URL(updateData.attachment_urls[0]);
+          updateData.storage_path = urlObj.searchParams.get('path');
+        } catch (e) {}
+      }
+    }
 
     const { data, error } = await supabase
       .from('doctor_visits')

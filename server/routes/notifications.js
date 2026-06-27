@@ -54,7 +54,13 @@ router.get('/', async (req, res) => {
       
     if (countError) throw countError;
 
-    res.json({ data: notifications, unread_count: count });
+    const formattedNotifications = (notifications || []).map(n => ({
+      ...n,
+      body: n.body || n.message,
+      message: n.message || n.body
+    }));
+
+    res.json({ data: formattedNotifications, unread_count: count });
   } catch (err) {
     console.error('Error fetching notifications:', err);
     res.status(500).json({ error: 'Failed to fetch notifications' });
@@ -73,7 +79,7 @@ router.patch('/:id/read', async (req, res) => {
       .eq('id', id)
       .single();
       
-    if (!notif || notif.circle_id !== req.user.circle_id) {
+    if (!notif || String(notif.circle_id) !== String(req.user.circle_id)) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 

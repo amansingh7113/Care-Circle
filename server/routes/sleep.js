@@ -15,6 +15,9 @@ router.use(authenticate);
 router.get('/:circleId', async (req, res) => {
   try {
     const { circleId } = req.params;
+    if (String(circleId) !== String(req.user.circle_id)) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle sleep logs' });
+    }
     
     const { data, error } = await supabase
       .from('sleep_logs')
@@ -38,6 +41,9 @@ router.post('/', async (req, res) => {
 
     if (!circle_id || !sleep_start || !sleep_end) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (String(circle_id) !== String(req.user.circle_id)) {
+      return res.status(403).json({ error: 'Unauthorized to add sleep logs to this circle' });
     }
 
     // Deduplication check

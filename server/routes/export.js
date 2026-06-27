@@ -42,14 +42,10 @@ router.get('/report', async (req, res) => {
     if (medError) console.error('Medicine fetch error:', medError);
     if (docError) console.error('Documents fetch error:', docError);
 
-    // Dynamically append authorization token to file_url for decryption
-    const authHeader = req.headers.authorization;
-    const token = authHeader ? authHeader.split(' ')[1] : '';
-
     const formattedDocs = (documents || []).map(doc => {
       let fileUrl = doc.file_url;
-      if (fileUrl && fileUrl.includes('/decrypt') && token) {
-        fileUrl = `${fileUrl}&token=${token}`;
+      if (fileUrl && fileUrl.includes('/decrypt')) {
+        fileUrl = fileUrl.split('&token=')[0];
       }
       return { ...doc, file_url: fileUrl };
     });

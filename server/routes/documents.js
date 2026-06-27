@@ -10,35 +10,49 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
-const upload = multer({ storage: multer.memoryStorage() });
+const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf', 'text/plain'];
+const upload = multer({ 
+  storage: multer.memoryStorage(), 
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (allowedMimeTypes.includes(file.mimetype) || file.originalname.endsWith('.pdf')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPG, PNG, PDF, and TXT are allowed.'));
+    }
+  }
+});
 
-const ALGORITHM = 'aes-256-cbc';
-const KEY_LENGTH = 32;
+const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
+const AUTH_TAG_LENGTH = 16;
 
 function encrypt(buffer, keyString) {
   const key = crypto.createHash('sha256').update(keyString).digest();
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   const encrypted = Buffer.concat([cipher.update(buffer), cipher.final()]);
-  return Buffer.concat([iv, encrypted]);
+  const tag = cipher.getAuthTag();
+  return Buffer.concat([iv, tag, encrypted]);
 }
 
 function decrypt(buffer, keyString) {
   const key = crypto.createHash('sha256').update(keyString).digest();
   const iv = buffer.subarray(0, IV_LENGTH);
-  const encryptedData = buffer.subarray(IV_LENGTH);
+  const tag = buffer.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const encryptedData = buffer.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+  decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(encryptedData), decipher.final()]);
 }
 
-// 1. Decrypt endpoint (placed before router.use(authenticate) so it bypasses auth headers requirement)
+// 1. Decrypt endpoint (placed before router.use(authenticate) so it checks auth headers directly)
 router.get('/decrypt', async (req, res) => {
-  const token = req.query.token || (req.headers.authorization && req.headers.authorization.split(' ')[1]);
+  const token = req.headers.authorization && req.headers.authorization.split(' ')[1];
   const filePath = req.query.path;
 
   if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: missing token' });
+    return res.status(401).json({ error: 'Unauthorized: missing token in Authorization header' });
   }
   if (!filePath) {
     return res.status(400).json({ error: 'Missing path parameter' });
@@ -46,10 +60,32 @@ router.get('/decrypt', async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Verify circle_id in the path matches user's circle_id (isolation security check)
     const pathCircleId = filePath.split('/')[0];
-    if (String(pathCircleId) !== String(decoded.circle_id)) {
+    let isAuthorized = false;
+
+    if (String(pathCircleId) === String(decoded.circle_id)) {
+      isAuthorized = true;
+    }
+
+    // Fetch all circle_ids for this user from DB to support multi-circle Caregivers/Patients
+    if (!isAuthorized && decoded.id) {
+      const { data: userRecords } = await supabase.from('circle_memberships').select('circle_id').eq('user_id', decoded.id).eq('status', 'active');
+      if (userRecords && userRecords.length > 0) {
+        const circleIds = userRecords.map(r => String(r.circle_id));
+        if (circleIds.includes(String(pathCircleId))) {
+          isAuthorized = true;
+        }
+      }
+      // Fallback check on users table
+      if (!isAuthorized) {
+        const { data: uRecs } = await supabase.from('users').select('circle_id').eq('id', decoded.id);
+        if (uRecs && uRecs.length > 0 && String(uRecs[0].circle_id) === String(pathCircleId)) {
+          isAuthorized = true;
+        }
+      }
+    }
+
+    if (!isAuthorized) {
       return res.status(403).json({ error: 'Unauthorized to access this circle\'s files' });
     }
 
@@ -59,7 +95,7 @@ router.get('/decrypt', async (req, res) => {
       .download(filePath);
 
     if (error || !data) {
-      console.error('File download from storage failed:', error);
+      console.error('File download from storage failed [REDACTED]');
       return res.status(404).json({ error: 'File not found' });
     }
 
@@ -72,24 +108,27 @@ router.get('/decrypt', async (req, res) => {
     if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
     else if (ext === 'png') contentType = 'image/png';
     else if (ext === 'pdf') contentType = 'application/pdf';
+    else if (ext === 'txt') contentType = 'text/plain';
 
     res.setHeader('Content-Type', contentType);
     res.status(200).send(decryptedBuffer);
   } catch (err) {
-    console.error('Decryption failed:', err);
+    console.error('Decryption failed [REDACTED]');
     return res.status(401).json({ error: 'Unauthorized or invalid token' });
   }
 });
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 router.use(authenticate);
 
 // Get all documents for a circle
 router.get('/circle/:circleId', async (req, res) => {
   const { circleId } = req.params;
-  const userCircleId = req.user.circle_id;
 
-  if (String(circleId) !== String(userCircleId)) {
+  try {
+    assertCircleMember(req, circleId);
+  } catch (authErr) {
     return res.status(403).json({ error: 'Unauthorized access to this circle' });
   }
 
@@ -106,39 +145,47 @@ router.get('/circle/:circleId', async (req, res) => {
 
     if (error) throw error;
 
-    // Dynamically append authorization token to file_url for decryption
-    const authHeader = req.headers.authorization;
-    const token = authHeader ? authHeader.split(' ')[1] : '';
-
-    const formattedData = (data || []).map(doc => {
-      let fileUrl = doc.file_url;
-      if (fileUrl && fileUrl.includes('/decrypt') && token) {
-        fileUrl = `${fileUrl}&token=${token}`;
-      }
-      return { ...doc, file_url: fileUrl };
-    });
-
-    res.json(formattedData);
+    res.json(data || []);
   } catch (error) {
-    console.error('Error fetching documents:', error);
+    console.error('Error fetching documents [REDACTED]');
     res.status(500).json({ error: error.message });
   }
 });
 
 // Add a new document record
 router.post('/', async (req, res) => {
-  const { circle_id, uploaded_by, title, category, file_url, visit_id } = req.body;
+  const { circle_id, title, category, file_url, visit_id } = req.body;
   const userCircleId = req.user.circle_id;
+  const targetCircleId = circle_id || userCircleId;
 
-  if (circle_id && userCircleId && String(circle_id) !== String(userCircleId)) {
-    return res.status(403).json({ error: `Unauthorized: circle_id ${circle_id} does not match user circle ${userCircleId}` });
+  try {
+    assertCircleMember(req, targetCircleId);
+  } catch (authErr) {
+    return res.status(403).json({ error: `Unauthorized: circle_id does not match user circle` });
+  }
+
+  // Extract storage_path from file_url if present
+  let storage_path = null;
+  if (file_url) {
+    try {
+      const urlObj = new URL(file_url);
+      storage_path = urlObj.searchParams.get('path');
+    } catch (e) {}
   }
 
   try {
     const { data, error } = await supabase
       .from('documents')
       .insert([
-        { circle_id: circle_id || userCircleId, uploaded_by, title, category, file_url, visit_id: visit_id || null }
+        { 
+          circle_id: targetCircleId, 
+          uploaded_by: req.user.id, // Force uploaded_by to prevent impersonation (CC-014)
+          title, 
+          category, 
+          file_url, 
+          storage_path, 
+          visit_id: visit_id || null 
+        }
       ])
       .select()
       .single();
@@ -146,7 +193,7 @@ router.post('/', async (req, res) => {
     if (error) throw error;
     res.status(201).json(data);
   } catch (error) {
-    console.error('Error adding document:', error);
+    console.error('Error adding document [REDACTED]');
     res.status(500).json({ error: error.message });
   }
 });
@@ -168,7 +215,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
     const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
     const filePath = `${userCircleId}/${fileName}`;
 
-    // Encrypt file buffer
+    // Encrypt file buffer with AES-256-GCM
     const encryptedBuffer = encrypt(file.buffer, process.env.ENCRYPTION_KEY || process.env.JWT_SECRET);
 
     // Upload encrypted buffer to Supabase Storage
@@ -192,7 +239,7 @@ router.post('/upload', upload.single('file'), async (req, res) => {
       filePath
     });
   } catch (err) {
-    console.error('Upload encryption failed:', err);
+    console.error('Upload encryption failed [REDACTED]');
     res.status(500).json({ error: err.message || 'Failed to upload and encrypt file' });
   }
 });
@@ -206,9 +253,8 @@ router.post('/upload-url', async (req, res) => {
     return res.status(400).json({ error: 'Missing fileName, contentType, or circle_id' });
   }
 
-  const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-  if (!allowedTypes.includes(contentType)) {
-    return res.status(400).json({ error: 'Unsupported file type. Allowed: JPG, PNG, PDF.' });
+  if (!allowedMimeTypes.includes(contentType)) {
+    return res.status(400).json({ error: 'Unsupported file type. Allowed: JPG, PNG, PDF, TXT.' });
   }
 
   const filePath = `${userCircleId}/${fileName}`;
@@ -222,7 +268,7 @@ router.post('/upload-url', async (req, res) => {
 
     res.status(200).json({ signedUrl: data.signedUrl, token: data.token, filePath, maxFileSize: '10MB' });
   } catch (error) {
-    console.error('Error generating upload URL:', error);
+    console.error('Error generating upload URL [REDACTED]');
     res.status(500).json({ error: error.message });
   }
 });
@@ -230,13 +276,12 @@ router.post('/upload-url', async (req, res) => {
 // Delete a document
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-  const userCircleId = req.user.circle_id;
 
   try {
     // Verify document belongs to the user's circle before deleting
     const { data: doc, error: docError } = await supabase
       .from('documents')
-      .select('circle_id, file_url')
+      .select('circle_id, file_url, storage_path')
       .eq('id', id)
       .single();
 
@@ -244,22 +289,26 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Document not found' });
     }
 
-    if (String(doc.circle_id) !== String(userCircleId)) {
+    try {
+      assertCircleMember(req, doc.circle_id);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Unauthorized to delete this document' });
     }
 
-    // Try to delete the file from Supabase storage first
-    if (doc.file_url) {
+    // Prefer server-stored storage_path over client URL parsing (CC-004)
+    let filePath = doc.storage_path;
+    if (!filePath && doc.file_url) {
       try {
         const urlParams = new URL(doc.file_url);
-        const filePath = urlParams.searchParams.get('path');
-        if (filePath) {
-          await supabase.storage.from('documents').remove([filePath]);
-          console.log('Removed document file from storage:', filePath);
-        }
+        filePath = urlParams.searchParams.get('path');
       } catch (parseErr) {
-        console.warn('Failed to parse and remove document file from storage:', parseErr.message);
+        console.warn('Failed to parse document file_url [REDACTED]');
       }
+    }
+
+    if (filePath) {
+      await supabase.storage.from('documents').remove([filePath]);
+      console.log('Removed document file from storage [REDACTED]');
     }
 
     const { error } = await supabase
@@ -270,7 +319,7 @@ router.delete('/:id', async (req, res) => {
     if (error) throw error;
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting document:', error);
+    console.error('Error deleting document [REDACTED]');
     res.status(500).json({ error: error.message });
   }
 });

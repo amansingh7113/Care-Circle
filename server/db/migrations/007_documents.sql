@@ -21,18 +21,6 @@ CREATE POLICY "documents_isolation_policy" ON documents
 -- we will use SQL to insert if possible, but usually Supabase requires storage API or dashboard. 
 -- However, we can try to insert into storage.buckets and storage.objects)
 INSERT INTO storage.buckets (id, name, public) 
-VALUES ('documents', 'documents', true) 
-ON CONFLICT (id) DO NOTHING;
+VALUES ('documents', 'documents', false) 
+ON CONFLICT (id) DO UPDATE SET public = false;
 
--- Storage Policies for Documents Bucket
-CREATE POLICY "Public Access" 
-ON storage.objects FOR SELECT 
-USING ( bucket_id = 'documents' );
-
-CREATE POLICY "Upload Access" 
-ON storage.objects FOR INSERT 
-WITH CHECK ( bucket_id = 'documents' );
-
-CREATE POLICY "Delete Access" 
-ON storage.objects FOR DELETE 
-USING ( bucket_id = 'documents' );

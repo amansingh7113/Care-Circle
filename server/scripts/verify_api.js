@@ -271,7 +271,9 @@ async function verifyApiLifecycle() {
 
     // Decrypt the file by calling the backend decrypt endpoint
     console.log('\n[Stage 6] Decrypting file via backend: GET /api/v1/documents/decrypt');
-    const decryptRes = await fetch(`${decryptionUrl}&token=${updatedToken}`);
+    const decryptRes = await fetch(`${decryptionUrl}`, {
+      headers: finalAuthHeaders
+    });
     if (!decryptRes.ok) {
       const errText = await decryptRes.text();
       console.error(`Decryption failed with status ${decryptRes.status}: ${errText}. Exiting.`);
@@ -329,11 +331,11 @@ async function verifyApiLifecycle() {
     }
 
     console.log('Fetched document URL:', insertedDoc.file_url);
-    if (!insertedDoc.file_url.includes('token=')) {
-      console.error('Verification Failure: Returned file_url does not append session token.');
+    if (insertedDoc.file_url.includes('token=')) {
+      console.error('Verification Failure: Returned file_url unexpectedly appends session token.');
       process.exit(1);
     }
-    console.log('Success: Session token is dynamically appended to the document URL.');
+    console.log('Success: Session token is securely excluded from the document URL.');
 
     // Delete document and verify it is removed from both DB and storage
     console.log('\n[Stage 6] Deleting document: DELETE /api/v1/documents/:id');

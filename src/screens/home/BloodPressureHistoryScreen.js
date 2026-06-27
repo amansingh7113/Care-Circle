@@ -126,7 +126,7 @@ const BloodPressureHistoryScreen = ({ navigation }) => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Blood Pressure History</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={() => setAddModalVisible(true)}>
+        <TouchableOpacity testID="add-bp-button" style={styles.addButton} onPress={() => setAddModalVisible(true)}>
           <Ionicons name="add" size={28} color={THEME.colors.primary} />
         </TouchableOpacity>
       </View>

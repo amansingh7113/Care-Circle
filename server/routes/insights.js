@@ -13,21 +13,24 @@ const supabase = createClient(
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || 'dummy_key_if_not_set' });
 
 const authenticate = require('../middleware/authenticate');
+const createRateLimiter = require('../middleware/rateLimiter');
+const { assertCircleMember } = require('../middleware/authorizer');
+
 router.use(authenticate);
+router.use(createRateLimiter({ windowMs: 60 * 1000, max: 10 }));
 
 router.post('/generate-manual', async (req, res) => {
-  // ARCHITECTURE NOTE: Currently uses cloud Gemini API for prescription analysis.
-  // Future migration path: Route through a secure, locally hosted LLM pipeline
-  // (e.g., Llama 3.2 via Ollama server) to ensure patient medical records
-  // never leave the enterprise environment. This would involve:
-  // 1. Replace Gemini SDK calls with HTTP requests to local Ollama endpoint
-  // 2. Use a vision-capable model (e.g., llava) for prescription image analysis
-  // 3. Keep the same structured output schema for frontend compatibility
-  const { prescription_id, force_refresh } = req.body;
-  const circleId = req.user.circle_id;
+  const { prescription_id, force_refresh, circle_id } = req.body;
+  const circleId = circle_id || req.user.circle_id;
 
   if (!circleId) {
-    return res.status(400).json({ error: 'User does not belong to a circle' });
+    return res.status(403).json({ error: 'Unauthorized: No circle_id provided' });
+  }
+
+  try {
+    assertCircleMember(req, circleId);
+  } catch (authErr) {
+    return res.status(403).json({ error: 'Unauthorized access to this circle insights' });
   }
 
   if (!prescription_id) {
@@ -35,9 +38,20 @@ router.post('/generate-manual', async (req, res) => {
   }
 
   try {
+    // Check AI Quota: Max 20 insights per circle per 24 hours (CC-010)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count: quotaCount, error: quotaErr } = await supabase
+      .from('ai_insights_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('circle_id', circleId)
+      .gte('created_at', twentyFourHoursAgo);
+
+    if (!quotaErr && quotaCount >= 20) {
+      return res.status(429).json({ error: 'AI daily quota exceeded for this circle (Max 20 requests per 24 hours).' });
+    }
+
     // 1. Check Cache
     if (!force_refresh) {
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
       const { data: cachedInsight } = await supabase
         .from('ai_insights_history')
         .select('insight_data')
@@ -70,7 +84,25 @@ router.post('/generate-manual', async (req, res) => {
 
     // Determine if fileUrl is a full URL or a storage path
     if (fileUrl.startsWith('http://') || fileUrl.startsWith('https://')) {
-      const response = await fetch(fileUrl);
+      try {
+        const parsedUrl = new URL(fileUrl);
+        const host = parsedUrl.hostname.toLowerCase();
+        const isAllowedDomain = host.endsWith('.supabase.co') || host.endsWith('.supabase.in') || host.endsWith('.carecircle.in');
+        const isBannedIP = host === 'localhost' || host === '127.0.0.1' || host.startsWith('169.254.') || host.startsWith('10.') || host.startsWith('192.168.');
+        
+        if (!isAllowedDomain || isBannedIP) {
+          return res.status(400).json({ error: 'Disallowed file URL host' });
+        }
+      } catch (urlErr) {
+        return res.status(400).json({ error: 'Invalid file URL structure' });
+      }
+
+      // Hardened fetch with abort signal timeout (CC-009)
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 10000);
+      const response = await fetch(fileUrl, { signal: controller.signal });
+      clearTimeout(id);
+      
       if (!response.ok) {
         return res.status(500).json({ error: 'Failed to fetch prescription image from URL' });
       }
@@ -179,7 +211,7 @@ router.post('/generate-manual', async (req, res) => {
         }
       }
     } catch (parseErr) {
-      console.warn('Failed to parse AI response, using fallback schema', parseErr);
+      console.warn('Failed to parse AI response, using fallback schema [REDACTED]');
       outputJson = {
         telemetry_correlations: [],
         whats_right: [],
@@ -197,15 +229,23 @@ router.post('/generate-manual', async (req, res) => {
 
     res.status(200).json(outputJson);
   } catch (error) {
-    console.error('Insights generation error:', error);
+    console.error('Insights generation error [REDACTED]');
     res.status(500).json({ error: error.message || 'Failed to generate insights' });
   }
 });
 
 router.get('/health-score', async (req, res) => {
   try {
-    const circleId = req.user.circle_id;
-    if (!circleId) return res.status(400).json({ error: 'User does not belong to a circle' });
+    const circleId = req.query.circle_id || req.user.circle_id;
+    if (!circleId) {
+      return res.status(403).json({ error: 'Unauthorized: No circle_id provided' });
+    }
+
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    }
 
     const { data: insight, error } = await supabase
       .from('ai_insights_history')
@@ -230,15 +270,23 @@ router.get('/health-score', async (req, res) => {
       created_at: insight.created_at
     });
   } catch (error) {
-    console.error('Error fetching health score:', error);
+    console.error('Error fetching health score [REDACTED]');
     res.status(500).json({ error: 'Failed to fetch health score' });
   }
 });
 
 router.get('/correlations', async (req, res) => {
   try {
-    const circleId = req.user.circle_id;
-    if (!circleId) return res.status(400).json({ error: 'User does not belong to a circle' });
+    const circleId = req.query.circle_id || req.user.circle_id;
+    if (!circleId) {
+      return res.status(403).json({ error: 'Unauthorized: No circle_id provided' });
+    }
+
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    }
 
     const { data: insight, error } = await supabase
       .from('ai_insights_history')
@@ -261,27 +309,49 @@ router.get('/correlations', async (req, res) => {
       created_at: insight.created_at
     });
   } catch (error) {
-    console.error('Error fetching correlations:', error);
+    console.error('Error fetching correlations [REDACTED]');
     res.status(500).json({ error: 'Failed to fetch correlations' });
   }
 });
 
 router.get('/doctor-summary', async (req, res) => {
   try {
-    const circleId = req.user.circle_id;
-    if (!circleId) return res.status(400).json({ error: 'User does not belong to a circle' });
+    const circleId = req.query.circle_id || req.user.circle_id;
+    if (!circleId) {
+      return res.status(403).json({ error: 'Unauthorized: No circle_id provided' });
+    }
+
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    }
+
+    // Check AI Quota: Max 20 insights per circle per 24 hours (CC-010)
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count: quotaCount, error: quotaErr } = await supabase
+      .from('ai_insights_history')
+      .select('*', { count: 'exact', head: true })
+      .eq('circle_id', circleId)
+      .gte('created_at', twentyFourHoursAgo);
+
+    if (!quotaErr && quotaCount >= 20) {
+      return res.status(429).json({ error: 'AI daily quota exceeded for this circle (Max 20 requests per 24 hours).' });
+    }
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
 
-    const [stepsRes, sleepRes, medsRes] = await Promise.all([
+    const [stepsRes, sleepRes, medsRes, visitsRes] = await Promise.all([
       supabase.from('step_logs').select('date, step_count').eq('circle_id', circleId).gte('date', thirtyDaysAgoIso),
       supabase.from('sleep_logs').select('sleep_start, sleep_end, quality, notes').eq('circle_id', circleId).gte('created_at', thirtyDaysAgoIso),
-      supabase.from('medicine_dose_logs').select('status, taken_at').eq('circle_id', circleId).gte('taken_at', thirtyDaysAgoIso)
+      supabase.from('medicine_dose_logs').select('status, taken_at').eq('circle_id', circleId).gte('taken_at', thirtyDaysAgoIso),
+      supabase.from('doctor_visits').select('doctor_name, visit_date, reason, notes').eq('circle_id', circleId).order('visit_date', { ascending: false })
     ]);
 
     const telemetry = {
+      doctor_visits: visitsRes.data || [],
       steps: stepsRes.data || [],
       sleep: sleepRes.data || [],
       medicines: medsRes.data || []
@@ -289,11 +359,12 @@ router.get('/doctor-summary', async (req, res) => {
 
     const telemetrySummary = JSON.stringify(telemetry);
 
-    const prompt = `You are a professional medical assistant writing a concise 1-page health briefing for a doctor's visit. 
-Based on the following 30-day telemetry data of a patient (steps, sleep quality, medication adherence), write a clear, readable markdown summary.
-Highlight key trends, any medication adherence issues (missed doses), sleep issues, and overall activity status.
+    const prompt = `You are a professional medical assistant writing a concise 1-page health briefing and summary for a patient's care circle.
+Based on the following doctor visits history (doctor names, reasons, notes) and 30-day telemetry data (steps, sleep quality, medication adherence), write a clear, highly structured, readable markdown summary.
+First, summarize the recent Doctor Visits, including key advice, diagnoses, or notes from the doctors.
+Then, correlate these visits with the patient's recent telemetry trends (activity status, sleep patterns, medication adherence). Highlight any missed doses or areas needing attention.
 
-Telemetry Data:
+Data:
 ${telemetrySummary}`;
 
     const generatePromise = ai.models.generateContent({
@@ -306,9 +377,15 @@ ${telemetrySummary}`;
 
     const summaryText = response.text;
 
+    // Record usage in history
+    await supabase.from('ai_insights_history').insert([{
+      circle_id: circleId,
+      insight_data: { type: 'doctor-summary', summary: summaryText }
+    }]);
+
     res.status(200).json({ summary: summaryText });
   } catch (error) {
-    console.error('Error generating doctor summary:', error);
+    console.error('Error generating doctor summary [REDACTED]');
     res.status(500).json({ error: 'Failed to generate summary' });
   }
 });

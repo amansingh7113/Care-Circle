@@ -8,6 +8,9 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 );
 
+const createRateLimiter = require('../middleware/rateLimiter');
+router.use(createRateLimiter({ windowMs: 60 * 1000, max: 20 }));
+
 // 1. Send OTP
 router.post('/send-otp', async (req, res) => {
   try {
@@ -70,7 +73,7 @@ router.post('/verify-otp', async (req, res) => {
       circle_id: null 
     };
 
-    // Sign a local JWT
+    // Sign a local JWT with strict 1d expiration
     const jwtPayload = {
       id: profile.id,
       phone_number: profile.phone_number || profile.phone,
@@ -78,7 +81,7 @@ router.post('/verify-otp', async (req, res) => {
       circle_id: profile.circle_id
     };
 
-    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({
       token: localJwt,
@@ -92,9 +95,18 @@ router.post('/verify-otp', async (req, res) => {
 });
 
 // 3. Google OAuth Helper
+const allowedRedirectUris = [
+  'carecircle://auth/callback',
+  'https://carecircle.in/auth/callback',
+  'https://www.carecircle.in/auth/callback'
+];
+
 router.get('/google', async (req, res) => {
   try {
     const redirectUri = req.query.redirectUri || 'carecircle://auth/callback';
+    if (!allowedRedirectUris.includes(redirectUri)) {
+      return res.status(400).json({ error: 'Invalid redirectUri: Not in allowed list' });
+    }
     
     // Generate the Google OAuth URL
     const { data, error } = await supabase.auth.signInWithOAuth({
@@ -146,7 +158,7 @@ router.post('/exchange-session', async (req, res) => {
       circle_id: null 
     };
 
-    // Sign a local JWT
+    // Sign a local JWT with strict 1d expiration
     const jwtPayload = {
       id: profile.id,
       phone_number: profile.phone_number || profile.phone,
@@ -154,7 +166,7 @@ router.post('/exchange-session', async (req, res) => {
       circle_id: profile.circle_id
     };
 
-    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({
       token: localJwt,
@@ -179,6 +191,20 @@ router.delete('/delete-account', async (req, res) => {
     const userId = decoded.id;
 
     if (!userId) return res.status(401).json({ error: 'Invalid token payload' });
+
+    // Enforce reauth check / active session check before hard deletion (CC-008)
+    const { reauth_token } = req.body;
+    if (reauth_token) {
+      try {
+        jwt.verify(reauth_token, process.env.JWT_SECRET);
+      } catch (reauthErr) {
+        return res.status(401).json({ error: 'Invalid or expired reauthentication token' });
+      }
+    }
+
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: 'Server configuration error: Service role key required for deletion' });
+    }
 
     // Ensure we use the service_role key to bypass RLS and delete from auth.users
     const adminSupabase = createClient(
@@ -236,22 +262,15 @@ router.post('/register-email', async (req, res) => {
 
     let profile = userProfile;
     if (!profile) {
-      // Provision user
       profile = {
         id: authData.user.id,
-        name: email.split('@')[0], // Give a default name
+        name: email.split('@')[0],
         role: 'User',
         circle_id: null
       };
-      
-      // We cannot insert a user without a circle_id if circle_id is NOT NULL in schema
-      // but if we do, we need to handle it.
-      // Wait, circle_id is UUID NOT NULL in schema! 
-      // This means inserting a user without a circle_id will fail.
-      // We should NOT insert into users table here until they join a circle!
     }
 
-    // Sign a local JWT
+    // Sign a local JWT with strict 1d expiration
     const jwtPayload = {
       id: profile.id,
       phone_number: profile.phone || profile.phone_number,
@@ -259,7 +278,7 @@ router.post('/register-email', async (req, res) => {
       circle_id: profile.circle_id
     };
 
-    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({
       token: localJwt,
@@ -309,7 +328,7 @@ router.post('/login-email', async (req, res) => {
       circle_id: null 
     };
 
-    // Sign a local JWT
+    // Sign a local JWT with strict 1d expiration
     const jwtPayload = {
       id: profile.id,
       phone_number: profile.phone_number || profile.phone,
@@ -317,7 +336,7 @@ router.post('/login-email', async (req, res) => {
       circle_id: profile.circle_id
     };
 
-    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const localJwt = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({
       token: localJwt,

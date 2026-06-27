@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, Alert, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME } from '../../styles/theme';
-import RazorpayCheckout from 'react-native-razorpay';
 import { createPaymentOrder, verifyPayment } from '../../services/paymentApi';
 import { useStore } from '../../store/useStore';
 import * as Haptics from 'expo-haptics';
+
+let RazorpayCheckout;
+if (Platform.OS !== 'web') {
+  RazorpayCheckout = require('react-native-razorpay').default;
+}
 
 const PremiumUpgradeScreen = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(false);

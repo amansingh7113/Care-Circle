@@ -14,6 +14,9 @@ router.use(authenticate);
 // 1. Fetch step logs for a circle
 router.get('/:circleId', async (req, res) => {
   const { circleId } = req.params;
+  if (String(circleId) !== String(req.user.circle_id)) {
+    return res.status(403).json({ error: 'Unauthorized access to this circle step logs' });
+  }
   const requestedLimit = parseInt(req.query.limit, 10);
   const limit = (requestedLimit > 0 && requestedLimit <= 90) ? requestedLimit : 7;
 
@@ -45,24 +48,52 @@ router.post('/', async (req, res) => {
   if (!circle_id || !date || step_count === undefined) {
     return res.status(400).json({ error: 'Missing required fields: circle_id, date, step_count' });
   }
+  if (String(circle_id) !== String(req.user.circle_id)) {
+    return res.status(403).json({ error: 'Unauthorized to add step logs to this circle' });
+  }
 
   try {
-    // Upsert the step count for the specific circle, patient, and date
-    const { data: log, error } = await supabase
+    // Check if a record already exists for this circle_id and date
+    const { data: existing, error: findError } = await supabase
       .from('step_logs')
-      .upsert(
-        { circle_id, patient_id, date, step_count },
-        { onConflict: 'circle_id, patient_id, date' }
-      )
-      .select()
-      .single();
+      .select('*')
+      .eq('circle_id', circle_id)
+      .eq('date', date)
+      .limit(1);
 
-    if (error) {
-      console.error('Sync step log error:', error);
-      return res.status(500).json({ error: error.message });
+    if (findError) {
+      console.error('Find step log error:', findError);
+      return res.status(500).json({ error: findError.message });
     }
 
-    res.status(200).json(log);
+    if (existing && existing.length > 0) {
+      // Update existing record
+      const { data: log, error: updateError } = await supabase
+        .from('step_logs')
+        .update({ step_count })
+        .eq('id', existing[0].id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Update step log error:', updateError);
+        return res.status(500).json({ error: updateError.message });
+      }
+      return res.status(200).json(log);
+    } else {
+      // Insert new record
+      const { data: log, error: insertError } = await supabase
+        .from('step_logs')
+        .insert([{ circle_id, date, step_count }])
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Insert step log error:', insertError);
+        return res.status(500).json({ error: insertError.message });
+      }
+      return res.status(200).json(log);
+    }
   } catch (err) {
     console.error('Sync step log error:', err);
     res.status(500).json({ error: 'Internal server error' });

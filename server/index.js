@@ -4,24 +4,41 @@ validateEnv();
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+const allowedOrigins = [
+  'https://carecircle.in',
+  'https://www.carecircle.in',
+  'http://localhost:3000',
+  'http://localhost:5000'
+];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy violation: Origin not allowed'));
+    }
+  },
+  credentials: true
+}));
+
+app.use(express.json({ limit: '10mb' }));
 
 // Initialize Supabase Client
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-
-// Create a single supabase client for interacting with your database
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabase = require('./config/supabaseClient');
 
 const authenticate = require('./middleware/authenticate');
+const { assertCircleMember } = require('./middleware/authorizer');
 
 // Mount Routes
 const authRouter = require('./routes/auth');
@@ -65,13 +82,21 @@ app.get('/api/v1/dashboard', authenticate, async (req, res) => {
     const circle_id = req.query.circle_id || req.user.circle_id;
     if (!circle_id) return res.status(403).json({ error: 'No circle_id provided' });
 
-    const [vitals, sleep, steps, medicines, tasks] = await Promise.all([
+    try {
+      assertCircleMember(req, circle_id);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle dashboard' });
+    }
+
+    const results = await Promise.allSettled([
       supabase.from('blood_pressure_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('sleep_logs').select('*').eq('circle_id', circle_id).order('logged_at', { ascending: false }).limit(5),
       supabase.from('step_logs').select('*').eq('circle_id', circle_id).order('date', { ascending: false }).limit(5),
       supabase.from('medicines').select('*').eq('circle_id', circle_id).eq('is_archived', false),
       supabase.from('tasks').select('*, assignee:users(name)').eq('circle_id', circle_id)
     ]);
+
+    const [vitals, sleep, steps, medicines, tasks] = results.map(res => res.status === 'fulfilled' ? res.value : { data: [] });
 
     res.status(200).json({
       data: {

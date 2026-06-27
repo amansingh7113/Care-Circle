@@ -14,7 +14,10 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "associatedDomains": [
+        "applinks:care-circle-backend-hfc0.onrender.com"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -31,6 +34,10 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
+            {
+              "scheme": "https",
+              "host": "care-circle-backend-hfc0.onrender.com"
+            },
             {
               "scheme": "carecircle",
               "host": "care-circle-backend-hfc0.onrender.com"

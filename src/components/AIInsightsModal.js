@@ -126,8 +126,6 @@ const styles = StyleSheet.create({
   retryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 });
 
-});
-
 export default function WrappedAIInsightsModal(props) {
   return (
     <ErrorBoundary>

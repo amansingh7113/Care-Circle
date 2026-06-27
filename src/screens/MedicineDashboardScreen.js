@@ -3,7 +3,12 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, 
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
+
+let TextRecognition;
+if (Platform.OS !== 'web') {
+  TextRecognition = require('@react-native-ml-kit/text-recognition').default;
+}
+
 import { COMMON_MEDICINES } from '../utils/commonMedicines';
 import { getMedicines, logAdministration, addMedicine, deleteMedicine, updateMedicine } from '../services/medicineApi';
 import { useStore } from '../store/useStore';
@@ -580,7 +585,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.colors.canvas, padding: 20 },
   headerRow: { marginBottom: 24, marginTop: 40, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   header: { ...THEME.typography.header, color: THEME.colors.textHeader, fontSize: 24, letterSpacing: 0 },
-  list: { paddingBottom: 20 },
+  list: { paddingBottom: 120 },
   card: { 
     backgroundColor: THEME.colors.cardBg, 
     borderRadius: THEME.borderRadius.card, 
@@ -693,14 +698,14 @@ const styles = StyleSheet.create({
   timeTag: { 
     flexDirection: 'row', alignItems: 'center', 
     backgroundColor: THEME.colors.primary, 
-    paddingHorizontal: 12, paddingVertical: 8, 
+    paddingHorizontal: 12, minHeight: 48, justifyContent: 'center', 
     borderRadius: 20, marginRight: 8, marginBottom: 8 
   },
   timeTagText: { color: THEME.colors.white, fontWeight: '600' },
   addTimeBtn: { 
     flexDirection: 'row', alignItems: 'center', 
     borderWidth: 1, borderColor: THEME.colors.primary, borderStyle: 'dashed',
-    paddingHorizontal: 12, paddingVertical: 8, 
+    paddingHorizontal: 12, minHeight: 48, justifyContent: 'center', 
     borderRadius: 20, marginBottom: 8 
   },
   addTimeBtnText: { color: THEME.colors.primary, fontWeight: '600', marginLeft: 4 },
@@ -769,7 +774,7 @@ const styles = StyleSheet.create({
   },
   freqChip: {
     borderWidth: 1, borderColor: THEME.colors.border,
-    paddingHorizontal: 12, paddingVertical: 8, 
+    paddingHorizontal: 12, minHeight: 48, justifyContent: 'center', alignItems: 'center',
     borderRadius: 20, marginRight: 8, marginBottom: 8 
   },
   freqChipActive: {
@@ -779,7 +784,7 @@ const styles = StyleSheet.create({
   freqChipText: { color: THEME.colors.textMuted, fontWeight: '600' },
   freqChipTextActive: { color: THEME.colors.white },
   dayCircle: {
-    width: 36, height: 36, borderRadius: 18,
+    width: 48, height: 48, borderRadius: 24,
     backgroundColor: THEME.colors.surface,
     justifyContent: 'center', alignItems: 'center'
   },

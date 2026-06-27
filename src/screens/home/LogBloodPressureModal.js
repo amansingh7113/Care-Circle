@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ActivityIndicator, Alert, Modal, SafeAreaView, Image, Platform, KeyboardAvoidingView, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import TextRecognition from '@react-native-ml-kit/text-recognition';
+
+let TextRecognition;
+if (Platform.OS !== 'web') {
+  TextRecognition = require('@react-native-ml-kit/text-recognition').default;
+}
 import { logVitals } from '../../services/vitalsApi';
 import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';

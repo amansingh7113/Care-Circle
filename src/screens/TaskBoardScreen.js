@@ -205,9 +205,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.colors.deepNavy, padding: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 40 },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
-  backBtn: { padding: 8, marginLeft: -8, marginRight: 8 },
+  backBtn: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'flex-start', marginLeft: -8, marginRight: 8 },
   header: { ...THEME.typography.header, color: THEME.colors.white, fontSize: 28 },
-  addBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  addBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, minHeight: 48, justifyContent: 'center', borderRadius: 20 },
   addBtnText: { color: THEME.colors.white, fontWeight: '700' },
   tabContainer: { 
     flexDirection: 'row', 
@@ -217,11 +217,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     padding: 4
   },
-  tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: THEME.borderRadius.badge },
+  tab: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: THEME.borderRadius.badge },
   activeTab: { backgroundColor: THEME.colors.primary },
   tabText: { ...THEME.typography.cardTitle, color: THEME.colors.textMuted, fontSize: 14 },
   activeTabText: { color: THEME.colors.white },
-  listContainer: { paddingBottom: 150 },
+  listContainer: { paddingBottom: 220 },
   groupHeader: {
     color: THEME.colors.white,
     ...THEME.typography.label,
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   taskDetails: { ...THEME.typography.body, color: THEME.colors.textMuted, fontSize: 12 },
   actions: { marginLeft: 16, flexDirection: 'row', alignItems: 'center' },
   completionBadge: { 
-    width: 32, height: 32, borderRadius: 16,
+    width: 48, height: 48, borderRadius: 24,
     borderWidth: 2, borderColor: THEME.colors.primary,
     justifyContent: 'center', alignItems: 'center',
     backgroundColor: THEME.colors.cardBg
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   contentArea: { flex: 1 },
   bottomIllustration: {
     position: 'absolute',
-    bottom: 0, left: 0, right: 0,
+    bottom: 90, left: 0, right: 0,
     alignItems: 'center',
     justifyContent: 'flex-end',
     zIndex: -1

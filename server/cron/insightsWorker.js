@@ -4,9 +4,12 @@ const { createClient } = require('@supabase/supabase-js');
 let supabase;
 function getSupabase() {
   if (!supabase) {
+    if (!process.env.SUPABASE_URL || !(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY)) {
+      throw new Error('Supabase credentials not configured in environment');
+    }
     supabase = createClient(
-      process.env.SUPABASE_URL || 'https://tslppywdlbayvgtuqpqb.supabase.co',
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_hk-qJ2c4QhQ5BCQIL1UYPg_8zRUg9Fl'
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
     );
   }
   return supabase;

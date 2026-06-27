@@ -8,6 +8,7 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember, assertCircleRole } = require('../middleware/authorizer');
 router.use(authenticate);
 
 router.post('/', async (req, res) => {
@@ -17,15 +18,22 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Amount and category are required' });
     }
     
-    if (!req.user.circle_id) {
+    const circleId = req.user.circle_id;
+    if (!circleId) {
       return res.status(403).json({ error: 'User is not part of any circle' });
+    }
+
+    try {
+      assertCircleRole(req, circleId, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized to add expenses: Requires Admin or Caregiver role' });
     }
 
     const { data, error } = await supabase
       .from('expenses')
       .insert([
         {
-          circle_id: req.user.circle_id,
+          circle_id: circleId,
           amount,
           category,
           description,
@@ -47,6 +55,12 @@ router.get('/summary', async (req, res) => {
   try {
     const circleId = req.user.circle_id;
     if (!circleId) return res.status(403).json({ error: 'User is not part of any circle' });
+
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    }
 
     // Get current month dates
     const now = new Date();
@@ -86,7 +100,6 @@ router.get('/summary', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const expenseId = req.params.id;
-    const userCircleId = req.user.circle_id;
 
     const { data: exp, error: expError } = await supabase
       .from('expenses')
@@ -98,8 +111,10 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Expense not found' });
     }
 
-    if (String(exp.circle_id) !== String(userCircleId)) {
-      return res.status(403).json({ error: 'Unauthorized access to this expense' });
+    try {
+      assertCircleRole(req, exp.circle_id, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to delete this expense: Requires Admin or Caregiver role' });
     }
 
     const { error } = await supabase
@@ -125,9 +140,19 @@ router.put('/budget', async (req, res) => {
     if (!monthly_limit || monthly_limit <= 0) {
       return res.status(400).json({ error: 'Valid monthly_limit is required' });
     }
+
+    const circleId = req.user.circle_id;
+    if (!circleId) return res.status(403).json({ error: 'User is not part of any circle' });
+
+    try {
+      assertCircleRole(req, circleId, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized to update circle budget: Requires Admin or Caregiver role' });
+    }
+
     const { data, error } = await supabase
       .from('circle_budgets')
-      .upsert({ circle_id: req.user.circle_id, monthly_limit, updated_at: new Date().toISOString() }, { onConflict: 'circle_id' })
+      .upsert({ circle_id: circleId, monthly_limit, updated_at: new Date().toISOString() }, { onConflict: 'circle_id' })
       .select()
       .single();
     if (error) throw error;
@@ -141,10 +166,8 @@ router.put('/budget', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const expenseId = req.params.id;
-    const userCircleId = req.user.circle_id;
     const { amount, category, description } = req.body;
 
-    // Verify expense belongs to the user's circle
     const { data: exp, error: expError } = await supabase
       .from('expenses')
       .select('circle_id')
@@ -155,8 +178,10 @@ router.patch('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Expense not found' });
     }
 
-    if (String(exp.circle_id) !== String(userCircleId)) {
-      return res.status(403).json({ error: 'Unauthorized access to this expense' });
+    try {
+      assertCircleRole(req, exp.circle_id, ['Admin', 'Caregiver']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to update this expense: Requires Admin or Caregiver role' });
     }
 
     const updateData = {};

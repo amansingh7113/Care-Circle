@@ -16,6 +16,9 @@ router.use(authenticate);
 router.get('/:circleId', async (req, res) => {
   try {
     const { circleId } = req.params;
+    if (String(circleId) !== String(req.user.circle_id)) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle vitals' });
+    }
     
     const { data, error } = await supabase
       .from('blood_pressure_logs')
@@ -39,6 +42,9 @@ router.post('/', async (req, res) => {
 
     if (!circle_id || !systolic || !diastolic) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (String(circle_id) !== String(req.user.circle_id)) {
+      return res.status(403).json({ error: 'Unauthorized to add vitals to this circle' });
     }
 
     const { data, error } = await supabase
@@ -78,7 +84,7 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vital log not found' });
     }
 
-    if (existingLog.circle_id !== req.user.circle_id) {
+    if (String(existingLog.circle_id) !== String(req.user.circle_id)) {
       return res.status(403).json({ error: 'Forbidden: You do not have access to update this vital log' });
     }
 
@@ -112,7 +118,7 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vital log not found' });
     }
 
-    if (existingLog.circle_id !== req.user.circle_id) {
+    if (String(existingLog.circle_id) !== String(req.user.circle_id)) {
       return res.status(403).json({ error: 'Forbidden: You do not have access to delete this vital log' });
     }
 

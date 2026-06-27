@@ -8,18 +8,19 @@ import {
   Modal,
   TextInput,
   ActivityIndicator,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
   ScrollView,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getExpensesSummary, addExpense, deleteExpense, updateExpense, updateBudget } from '../../services/expenseApi';
 import { useStore } from '../../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import AdBanner from '../../components/AdBanner';
 
-const ExpensesScreen = () => {
+const ExpensesScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState({ total_spent: 0, monthly_limit: 0, items: [] });
   const [modalVisible, setModalVisible] = useState(false);
@@ -31,6 +32,7 @@ const ExpensesScreen = () => {
   const [newBudgetAmount, setNewBudgetAmount] = useState('');
   const { currentCircle, user } = useStore();
   const circleId = currentCircle?.id || user?.circle_id;
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     fetchExpensesSummary();
@@ -146,10 +148,10 @@ const ExpensesScreen = () => {
       </View>
       <View style={{flexDirection: 'row', alignItems: 'center'}}>
         <Text style={[styles.transactionAmount, {marginRight: 12}]}>₹{item.amount}</Text>
-        <TouchableOpacity onPress={() => openEditModal(item)} style={{padding: 4, marginRight: 4}}>
+        <TouchableOpacity onPress={() => openEditModal(item)} style={{minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginRight: 4}}>
           <Ionicons name="pencil" size={18} color="#1A73E8" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDeleteExpense(item.id)} style={{padding: 4}}>
+        <TouchableOpacity onPress={() => handleDeleteExpense(item.id)} style={{minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center'}}>
           <Ionicons name="trash-outline" size={18} color="#D32F2F" />
         </TouchableOpacity>
       </View>
@@ -157,17 +159,26 @@ const ExpensesScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {loading ? (
         <ActivityIndicator size="large" color="#1A73E8" style={styles.loader} />
       ) : (
         <>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Expenses</Text>
-            <TouchableOpacity onPress={openBudgetModal} style={styles.editBudgetBtn}>
-              <Ionicons name="pencil" size={16} color="#1A73E8" />
-              <Text style={styles.editBudgetBtnText}>Edit Budget</Text>
-            </TouchableOpacity>
+          <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) + 16 }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                <Ionicons name="arrow-back" size={24} color="#1A73E8" />
+              </TouchableOpacity>
+              <Text style={styles.headerTitle}>Expenses</Text>
+            </View>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <TouchableOpacity onPress={openBudgetModal} style={styles.editBudgetBtn}>
+                <Text style={styles.editBudgetBtnText}>Edit Budget</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addIconBtn} onPress={openAddModal}>
+                <Text style={styles.addIconText}>+</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.progressContainer}>
@@ -192,14 +203,6 @@ const ExpensesScreen = () => {
           />
         </>
       )}
-
-      <TouchableOpacity 
-        style={styles.fab} 
-        onPress={openAddModal}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
 
       <Modal
         visible={modalVisible}
@@ -296,42 +299,61 @@ const ExpensesScreen = () => {
       </Modal>
 
       <AdBanner />
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#F5F7FA',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     backgroundColor: '#FFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#E2E8F0',
   },
   headerTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  backBtn: {
+    minHeight: 48,
+    minWidth: 48,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    marginRight: 8,
+  },
+  addIconBtn: {
+    minHeight: 48,
+    minWidth: 48,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    marginLeft: 12,
+  },
+  addIconText: {
+    fontSize: 28,
+    color: '#1A73E8',
+    fontWeight: '400',
   },
   editBudgetBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F0FE',
+    backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
+    minHeight: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editBudgetBtnText: {
-    color: '#1A73E8',
-    marginLeft: 6,
+    color: '#4F46E5',
     fontWeight: '600',
-    fontSize: 14,
   },
   loader: {
     flex: 1,
@@ -360,6 +382,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 15,
+    paddingBottom: 100,
   },
   transactionItem: {
     backgroundColor: '#FFF',
@@ -384,26 +407,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#1A73E8',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    minWidth: 56,
-    minHeight: 56,
-    borderRadius: 28,
-    backgroundColor: '#1A73E8',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  fabIcon: {
-    fontSize: 24,
-    color: '#FFF',
   },
   modalOverlay: {
     flex: 1,

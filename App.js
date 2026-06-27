@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import './src/i18n';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, View, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import AuthNavigator from './src/navigation/AuthNavigator';
 import AppNavigator from './src/navigation/AppNavigator';
@@ -14,7 +14,8 @@ import NetworkListener from './src/components/NetworkListener';
 import { registerForPushNotifications, setupNotificationListeners } from './src/services/pushNotifications';
 
 export default function App() {
-  const userSession = useStore((state) => state.userSession);
+  const storeUserSession = useStore((state) => state.userSession);
+  const userSession = (Platform.OS === 'web' && typeof window !== 'undefined' ? window.localStorage.getItem('userToken') : null) || storeUserSession;
   const [hasHydrated, setHasHydrated] = useState(useStore.persist?.hasHydrated?.() ?? true);
 
   useEffect(() => {
@@ -45,6 +46,21 @@ export default function App() {
         CircleSelection: 'join',
         Dashboard: 'dashboard',
         MedicineTracker: 'medicines',
+        TaskBoard: 'tasks',
+        DoctorVisits: 'doctor',
+        Expenses: 'expenses',
+        MedicineAnalytics: 'medicine-analytics',
+        CreateTask: 'create-task',
+        Settings: 'settings',
+        PremiumUpgrade: 'premium-upgrade',
+        ExportReport: 'export-report',
+        Documents: 'documents',
+        BloodPressureHistory: 'bp-history',
+        SleepDetails: 'sleep-details',
+        EditProfile: 'edit-profile',
+        ManageCircle: 'manage-circle',
+        Notifications: 'notifications',
+        StepHistory: 'step-history',
       },
     },
   };

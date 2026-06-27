@@ -12,24 +12,53 @@ const supabase = createClient(
 
 // Initialize Razorpay client
 // Using test credentials if env variables are missing for development
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_YourTestKeyHere',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'YourTestSecretHere',
-});
+const key_id = process.env.RAZORPAY_KEY_ID || (process.env.NODE_ENV === 'production' ? null : 'rzp_test_YourTestKeyHere');
+const key_secret = process.env.RAZORPAY_KEY_SECRET || (process.env.NODE_ENV === 'production' ? null : 'YourTestSecretHere');
+
+if (process.env.NODE_ENV === 'production' && (!key_id || !key_secret)) {
+  throw new Error('Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in production');
+}
+
+const razorpay = new Razorpay({ key_id, key_secret });
 
 // Endpoint to create a Razorpay order
 router.post('/create-order', authenticate, async (req, res) => {
   try {
-    const { amount, currency = 'INR', receipt = 'receipt#1' } = req.body;
-    
+    const circle_id = req.user.circle_id;
+    if (!circle_id) {
+      return res.status(403).json({ success: false, error: 'No circle_id provided' });
+    }
+
+    // Fixed price for premium family plan as per GEMINI.md (CC-006)
+    const expectedAmount = 149; 
+    const currency = 'INR';
+
     const options = {
-      amount: amount * 100, // amount in the smallest currency unit (paise)
+      amount: expectedAmount * 100, // amount in paise
       currency,
-      receipt,
-      payment_capture: 1 // Auto capture
+      receipt: `receipt_${circle_id}_${Date.now()}`.substring(0, 40),
+      payment_capture: 1
     };
 
     const order = await razorpay.orders.create(options);
+
+    // Persist order state in razorpay_orders table (CC-006)
+    const { error: insertErr } = await supabase
+      .from('razorpay_orders')
+      .insert([{
+        order_id: order.id,
+        circle_id: circle_id,
+        user_id: req.user.id,
+        amount: expectedAmount,
+        currency,
+        status: 'created'
+      }]);
+
+    if (insertErr) {
+      console.error('Failed to persist razorpay order:', insertErr);
+      return res.status(500).json({ success: false, error: 'Failed to initialize payment order' });
+    }
+
     res.status(200).json({ success: true, order });
   } catch (error) {
     console.error('Error creating Razorpay order:', error);
@@ -47,7 +76,26 @@ router.post('/verify', authenticate, async (req, res) => {
       return res.status(403).json({ success: false, error: 'No circle_id provided' });
     }
 
-    const secret = process.env.RAZORPAY_KEY_SECRET || 'YourTestSecretHere';
+    // Query razorpay_orders table to verify order binding and prevent reuse (CC-006)
+    const { data: orderRecord, error: orderErr } = await supabase
+      .from('razorpay_orders')
+      .select('*')
+      .eq('order_id', razorpay_order_id)
+      .single();
+
+    if (orderErr || !orderRecord) {
+      return res.status(404).json({ success: false, error: 'Payment order record not found' });
+    }
+
+    if (String(orderRecord.circle_id) !== String(circle_id)) {
+      return res.status(403).json({ success: false, error: 'Payment order does not belong to this circle' });
+    }
+
+    if (orderRecord.status === 'verified') {
+      return res.status(400).json({ success: false, error: 'Payment order has already been verified' });
+    }
+
+    const secret = key_secret;
 
     // Verify signature
     const generated_signature = crypto
@@ -56,6 +104,34 @@ router.post('/verify', authenticate, async (req, res) => {
       .digest('hex');
 
     if (generated_signature === razorpay_signature) {
+      // Verify payment status directly against Razorpay API before upgrading circle (CC-007)
+      if (process.env.NODE_ENV === 'production') {
+        try {
+          const payment = await razorpay.payments.fetch(razorpay_payment_id);
+          if (payment.status !== 'captured' && payment.status !== 'authorized') {
+            return res.status(400).json({ success: false, error: `Payment check failed: status is ${payment.status}` });
+          }
+        } catch (fetchErr) {
+          console.error('Razorpay payment fetch error:', fetchErr);
+          return res.status(502).json({ success: false, error: 'Failed to verify payment status with Razorpay API' });
+        }
+      } else {
+        try {
+          const payment = await razorpay.payments.fetch(razorpay_payment_id);
+          if (payment.status !== 'captured' && payment.status !== 'authorized') {
+            return res.status(400).json({ success: false, error: `Payment check failed: status is ${payment.status}` });
+          }
+        } catch (mockErr) {
+          console.log('Skipping strict Razorpay fetch in non-production environment due to dummy keys');
+        }
+      }
+
+      // Mark order as verified
+      await supabase
+        .from('razorpay_orders')
+        .update({ status: 'verified' })
+        .eq('order_id', razorpay_order_id);
+
       // Payment is successful, upgrade circle to premium
       const { error } = await supabase
         .from('circles')

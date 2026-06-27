@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { AppState, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useStore } from '../store/useStore';
 import CircleSelectionScreen from '../screens/CircleSelectionScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import MedicineDashboardScreen from '../screens/MedicineDashboardScreen';
 import CaregiverMedicinesScreen from '../screens/CaregiverMedicinesScreen';
+import SleepTrackerService from '../components/SleepTrackerService';
+import StepTrackerService from '../components/StepTrackerService';
 
 import TaskBoardScreen from '../screens/TaskBoardScreen';
 import CreateTaskScreen from '../screens/CreateTaskScreen';
@@ -28,14 +31,45 @@ const Stack = createStackNavigator();
 
 const AppNavigator = () => {
   const user = useStore(state => state.user);
+  const _hasHydrated = useStore(state => state._hasHydrated);
+  const currentCircle = useStore(state => state.currentCircle);
+  const subscribeToCircle = useStore(state => state.subscribeToCircle);
+  const unsubscribeFromCircle = useStore(state => state.unsubscribeFromCircle);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        unsubscribeFromCircle();
+      } else if (nextAppState === 'active') {
+        if (currentCircle?.id) {
+          subscribeToCircle(currentCircle.id);
+        }
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [currentCircle?.id, subscribeToCircle, unsubscribeFromCircle]);
+
+  if (!_hasHydrated) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#1A73E8" />
+      </View>
+    );
+  }
 
   return (
-    <Stack.Navigator
-      initialRouteName="CircleSelection"
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
+    <>
+      <SleepTrackerService />
+      <StepTrackerService />
+      <Stack.Navigator
+        initialRouteName="CircleSelection"
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
       <Stack.Screen name="CircleSelection" component={CircleSelectionScreen} />
       
       {user?.role === 'Patient' ? (
@@ -70,7 +104,17 @@ const AppNavigator = () => {
         </>
       )}
     </Stack.Navigator>
+    </>
   );
 };
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+});
 
 export default AppNavigator;

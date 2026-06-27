@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated, Linking, Pressable, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, Animated, Linking, Pressable, RefreshControl, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Pill } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getCircleDetails } from '../services/circleApi';
@@ -33,6 +34,7 @@ const vitalsConfig = [
 
 const DashboardScreen = ({ route, navigation }) => {
   const { circleId, circleName = 'My Circle' } = route.params || {};
+  const insets = useSafeAreaInsets();
   const [members, setMembers] = useState([]);
   const [medicines, setMedicines] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -168,7 +170,23 @@ const DashboardScreen = ({ route, navigation }) => {
         const dashboardData = dashboardResponse.data?.data;
         setBloodPressureLogs(Array.isArray(dashboardData?.vitals) ? dashboardData.vitals : []);
         setSleepLogs(Array.isArray(dashboardData?.sleep) ? dashboardData.sleep : []);
-        setStepLogs(Array.isArray(dashboardData?.steps) ? dashboardData.steps : []);
+        const serverSteps = Array.isArray(dashboardData?.steps) ? dashboardData.steps : [];
+        const today = new Date().toISOString().split('T')[0];
+        const currentLocalLogs = useStore.getState().stepLogs || [];
+        const localTodayLog = currentLocalLogs.find(s => s.date === today);
+        const serverTodayLog = serverSteps.find(s => s.date === today);
+        
+        let mergedSteps = [...serverSteps];
+        if (localTodayLog) {
+           const maxTodayCount = Math.max(localTodayLog.step_count || 0, serverTodayLog?.step_count || 0);
+           const serverIndex = mergedSteps.findIndex(s => s.date === today);
+           if (serverIndex !== -1) {
+              mergedSteps[serverIndex] = { ...mergedSteps[serverIndex], step_count: maxTodayCount };
+           } else {
+              mergedSteps.unshift({ date: today, step_count: maxTodayCount });
+           }
+        }
+        setStepLogs(mergedSteps);
         setMedicines(Array.isArray(dashboardData?.medicines) ? dashboardData.medicines : []);
         setTasks(Array.isArray(dashboardData?.tasks) ? dashboardData.tasks : []);
         setHydrationMl(hydrationData?.total_ml || 0);
@@ -234,9 +252,12 @@ const DashboardScreen = ({ route, navigation }) => {
   const handleSyncWearable = async () => {
     try {
       setIsSyncingWearable(true);
-      const steps = await syncWearableSteps(circleId);
+      const steps = await Promise.race([
+        syncWearableSteps(circleId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timed out connecting to wearable/sensors. Please try again.')), 4000))
+      ]);
       Alert.alert('Sync Complete', `Synced ${steps} steps from Google Fit/Health Connect.`);
-      fetchCircleData(); // Refresh UI
+      fetchCircleData().catch(e => console.log('fetchCircleData error:', e)); // Do not block UI!
     } catch (err) {
       Alert.alert('Sync Error', err.message || 'Failed to sync wearable data.');
     } finally {
@@ -410,7 +431,7 @@ const DashboardScreen = ({ route, navigation }) => {
         <Text style={styles.sectionTitle}>Upcoming Medication</Text>
         {nextMed && (
           <View style={styles.nextMedSection}>
-            <View style={styles.nextMedCard}>
+            <LinearGradient colors={THEME.gradients.primary} start={{x: 0, y: 0}} end={{x: 1, y: 1}} style={styles.nextMedCard}>
               <View style={styles.nextMedInfo}>
                 <View style={styles.nextMedHeader}>
                   <Text style={styles.nextMedTime}>{getMedTime(nextMed)}</Text>
@@ -433,7 +454,7 @@ const DashboardScreen = ({ route, navigation }) => {
                   <Text style={styles.logButtonText}>TAKE NOW</Text>
                 )}
               </TouchableOpacity>
-            </View>
+            </LinearGradient>
           </View>
         )}
 
@@ -600,10 +621,10 @@ const DashboardScreen = ({ route, navigation }) => {
       </ScrollView>
 
       {/* Blurred Header */}
-      <BlurView intensity={90} tint="light" style={styles.blurHeader}>
+      <BlurView intensity={90} tint="light" style={[styles.blurHeader, { paddingTop: Platform.OS === 'android' ? Math.max(insets.top, 20) : 0 }]}>
         <SafeAreaView>
           <View style={styles.headerContainer}>
-            <Text style={styles.header}>{circleName}</Text>
+            <Text style={[styles.header, { flexShrink: 1, marginRight: 10 }]} numberOfLines={1} ellipsizeMode="tail">{circleName}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Notifications')}>
                  <Text style={{fontSize: 24, color: THEME.colors.primary}}>🔔</Text>
@@ -630,8 +651,8 @@ const styles = StyleSheet.create({
   blurHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingHorizontal: 20 },
   headerContainer: { marginTop: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   header: { ...THEME.typography.header, color: THEME.colors.primary },
-  settingsIcon: { padding: 4, position: 'relative', marginLeft: 8 },
-  notificationBadge: { position: 'absolute', top: 0, right: 0, backgroundColor: THEME.colors.alert || '#E53935', borderRadius: 10, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+  settingsIcon: { padding: 12, position: 'relative', marginLeft: 8, minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  notificationBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: THEME.colors.alert || '#E53935', borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: THEME.colors.canvas },
   notificationBadgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
   sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 16, marginTop: 8 },
   
@@ -677,8 +698,8 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.cardBg,
     padding: 24, borderRadius: THEME.borderRadius.card,
     flexDirection: 'row', alignItems: 'center',
-    ...THEME.shadows.soft,
-    borderWidth: 1, borderColor: THEME.colors.border
+    ...THEME.shadows.medium,
+    borderWidth: 0
   },
   progressInfo: { marginLeft: 24, flex: 1 },
   progressValue: { ...THEME.typography.header, fontSize: 32, marginBottom: 4 },
@@ -687,9 +708,8 @@ const styles = StyleSheet.create({
   // Next Medication Card Styles
   nextMedSection: { marginBottom: 24 },
   nextMedCard: {
-    backgroundColor: THEME.colors.primary,
     borderRadius: THEME.borderRadius.card,
-    padding: 20,
+    padding: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -711,22 +731,23 @@ const styles = StyleSheet.create({
   logButtonText: { color: THEME.colors.primary, fontWeight: '800', fontSize: 14 },
 
   // Hydration Styles
-  hydrationContainer: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, flexDirection: 'row', justifyContent: 'space-between' },
-  hydrationText: { fontWeight: '700', fontSize: 14, color: '#374151', marginBottom: 8 },
-  progressBarBg: { height: 8, backgroundColor: '#e0f2fe', borderRadius: 4, marginBottom: 12 },
-  progressBarFill: { height: '100%', borderRadius: 4, backgroundColor: '#0ea5e9' },
-  logWaterBtn: { backgroundColor: '#0ea5e9', padding: 8, borderRadius: 8, alignItems: 'center' },
-  logWaterBtnText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  hydrationContainer: { backgroundColor: THEME.colors.cardBg, borderRadius: THEME.borderRadius.card, padding: 20, marginBottom: 20, ...THEME.shadows.medium, flexDirection: 'row', justifyContent: 'space-between' },
+  hydrationText: { fontWeight: '700', fontSize: 14, color: THEME.colors.textBody, marginBottom: 8 },
+  progressBarBg: { height: 8, backgroundColor: '#e0f2fe', borderRadius: 4, marginBottom: 16 },
+  progressBarFill: { height: '100%', borderRadius: 4, backgroundColor: THEME.colors.primary },
+  logWaterBtn: { backgroundColor: THEME.colors.primary, paddingVertical: 12, borderRadius: THEME.borderRadius.button, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+  logWaterBtnText: { color: THEME.colors.white, fontSize: 14, fontWeight: '800' },
   
   // Vitals Grid Styles
   vitalsSection: { marginBottom: 28 },
   vitalsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   vitalCard: {
     width: '48%', backgroundColor: THEME.colors.cardBg,
-    padding: 16, borderRadius: THEME.borderRadius.card,
-    marginBottom: 16, ...THEME.shadows.soft,
-    borderWidth: 1, borderColor: THEME.colors.border,
-    justifyContent: 'space-between'
+    padding: 20, borderRadius: THEME.borderRadius.card,
+    marginBottom: 16, ...THEME.shadows.medium,
+    borderWidth: 0,
+    justifyContent: 'space-between',
+    minHeight: 120
   },
   vitalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   vitalIcon: { fontSize: 20, marginRight: 8 },
@@ -752,8 +773,9 @@ const styles = StyleSheet.create({
   shortcutsContainer: { marginBottom: 20 },
   shortcutsRow: { flexDirection: 'row', justifyContent: 'space-between' },
   shortcutButton: {
-    width: '48%', padding: 16, borderRadius: THEME.borderRadius.badge,
-    alignItems: 'center', ...THEME.shadows.soft
+    width: '48%', padding: 18, borderRadius: THEME.borderRadius.button,
+    alignItems: 'center', ...THEME.shadows.medium,
+    minHeight: 56, justifyContent: 'center'
   },
   buttonText: { color: THEME.colors.white, fontSize: 14, fontWeight: '700' }
 });

@@ -158,9 +158,10 @@ async function checkMissedDoses() {
                   // SMS Fallback
                   const smsUsers = circleUsers.filter(u => u.phone_number);
                   for (const user of smsUsers) {
+                    const maskedPhone = user.phone_number ? user.phone_number.slice(0, -4).replace(/./g, '*') + user.phone_number.slice(-4) : '[REDACTED]';
                     if (process.env.SMS_GATEWAY_URL) {
                       try {
-                        console.log(`[Cron] Sending SMS fallback to ${user.phone_number}`);
+                        console.log(`[Cron] Sending SMS fallback to ${maskedPhone}`);
                         await fetch(process.env.SMS_GATEWAY_URL, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
@@ -173,7 +174,7 @@ async function checkMissedDoses() {
                         console.error('[Cron] SMS fallback error:', smsErr);
                       }
                     } else {
-                      console.log(`[Cron] SMS_GATEWAY_URL not configured. Mocking SMS to ${user.phone_number}`);
+                      console.log(`[Cron] SMS_GATEWAY_URL not configured. Mocking SMS to ${maskedPhone}`);
                     }
                   }
                 }

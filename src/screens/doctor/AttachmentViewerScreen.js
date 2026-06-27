@@ -50,6 +50,8 @@ const AttachmentViewerScreen = ({ route, navigation }) => {
     }
   };
 
+  const isPdf = url && url.toLowerCase().includes('.pdf');
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -67,22 +69,35 @@ const AttachmentViewerScreen = ({ route, navigation }) => {
       </View>
 
       <View style={styles.content}>
-        {loading && <ActivityIndicator style={styles.loader} size="large" color={THEME.colors.primary} />}
-        <Image
-          source={{ uri: url }}
-          style={styles.image}
-          resizeMode="contain"
-          onLoadEnd={() => setLoading(false)}
-          onError={() => setLoading(false)}
-        />
-        
-        {/* We provide this button overlay in case the image fails to load or is a PDF */}
-        {!loading && (
-          <View style={styles.overlayButtonContainer}>
-            <TouchableOpacity style={styles.openButton} onPress={handleOpenBrowser}>
+        {isPdf ? (
+          <View style={styles.pdfContainer}>
+            <Ionicons name="document-text" size={80} color={THEME.colors.primary} />
+            <Text style={styles.pdfTitle}>PDF Document</Text>
+            <Text style={styles.pdfSubtitle}>This attachment is a PDF document. Please use the button below to open it in an external browser.</Text>
+            <TouchableOpacity style={styles.openButtonPrimary} onPress={handleOpenBrowser}>
               <Text style={styles.openButtonText}>Open in External Browser</Text>
             </TouchableOpacity>
           </View>
+        ) : (
+          <>
+            {loading && <ActivityIndicator style={styles.loader} size="large" color={THEME.colors.primary} />}
+            <Image
+              source={{ uri: url }}
+              style={styles.image}
+              resizeMode="contain"
+              onLoadEnd={() => setLoading(false)}
+              onError={() => setLoading(false)}
+            />
+            
+            {/* We provide this button overlay in case the image fails to load */}
+            {!loading && (
+              <View style={styles.overlayButtonContainer}>
+                <TouchableOpacity style={styles.openButton} onPress={handleOpenBrowser}>
+                  <Text style={styles.openButtonText}>Open in External Browser</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -153,6 +168,31 @@ const styles = StyleSheet.create({
     padding: 8,
     backgroundColor: THEME.colors.white,
     borderRadius: 20,
+  },
+  pdfContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  pdfTitle: {
+    color: THEME.colors.white,
+    fontSize: 22,
+    fontWeight: '700',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  pdfSubtitle: {
+    color: THEME.colors.textMuted,
+    fontSize: 15,
+    textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  openButtonPrimary: {
+    backgroundColor: THEME.colors.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 12,
   }
 });
 

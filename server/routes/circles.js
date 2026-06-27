@@ -9,6 +9,7 @@ const supabase = createClient(
 );
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember, assertCircleRole } = require('../middleware/authorizer');
 router.use(authenticate);
 
 // 0. Fetch user circles
@@ -16,24 +17,25 @@ router.get('/', async (req, res) => {
   try {
     const user_id = req.user.id;
 
-  const { data: userRecords, error } = await supabase
-    .from('users')
-    .select('circle_id, role, circles(id, name, is_premium)')
-    .eq('id', user_id);
+    // Fetch from both legacy users table and circle_memberships table
+    const { data: userRecords, error } = await supabase
+      .from('users')
+      .select('circle_id, role, circles(id, name, is_premium)')
+      .eq('id', user_id);
 
-  if (error) {
-    console.error('Fetch circles error:', error);
-    return res.status(500).json({ error: error.message });
-  }
+    if (error) {
+      console.error('Fetch circles error:', error);
+      return res.status(500).json({ error: error.message });
+    }
 
-  const circles = userRecords.filter(r => r.circles).map(record => ({
-    id: record.circles.id,
-    name: record.circles.name,
-    is_premium: record.circles.is_premium,
-    role: record.role
-  }));
+    const circles = userRecords.filter(r => r.circles).map(record => ({
+      id: record.circles.id,
+      name: record.circles.name,
+      is_premium: record.circles.is_premium,
+      role: record.role
+    }));
 
-  res.status(200).json({ circles });
+    res.status(200).json({ circles });
   } catch (err) {
     console.error('Fetch circles catch error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -46,41 +48,49 @@ router.post('/', async (req, res) => {
     const { name, user_name } = req.body;
     const user_id = req.user.id;
 
-  if (!name) {
-    return res.status(400).json({ error: 'Circle name is required' });
-  }
+    if (!name) {
+      return res.status(400).json({ error: 'Circle name is required' });
+    }
 
-  // Insert new circle
-  const { data: circle, error: circleError } = await supabase
-    .from('circles')
-    .insert([{ name }])
-    .select()
-    .single();
+    // Insert new circle
+    const { data: circle, error: circleError } = await supabase
+      .from('circles')
+      .insert([{ name }])
+      .select()
+      .single();
 
-  if (circleError) {
-    console.error('Create circle error:', circleError);
-    return res.status(500).json({ error: circleError.message });
-  }
+    if (circleError) {
+      console.error('Create circle error:', circleError);
+      return res.status(500).json({ error: circleError.message });
+    }
 
-  // Upsert the user into the users table with 'Admin' role
-  const { error: userError } = await supabase
-    .from('users')
-    .upsert([{ 
-      id: user_id, 
-      circle_id: circle.id, 
-      name: user_name || req.user.phone_number || 'Caregiver', 
-      role: 'Admin' 
+    // Upsert the user into the users table with 'Admin' role
+    const { error: userError } = await supabase
+      .from('users')
+      .upsert([{ 
+        id: user_id, 
+        circle_id: circle.id, 
+        name: user_name || req.user.phone_number || 'Caregiver', 
+        role: 'Admin' 
+      }]);
+
+    if (userError) {
+      console.error('Upsert user admin role error:', userError);
+      return res.status(500).json({ error: userError.message });
+    }
+
+    // Explicitly insert into circle_memberships
+    await supabase.from('circle_memberships').upsert([{
+      user_id,
+      circle_id: circle.id,
+      role: 'Admin',
+      status: 'active'
     }]);
 
-  if (userError) {
-    console.error('Upsert user admin role error:', userError);
-    return res.status(500).json({ error: userError.message });
-  }
-
-  res.status(201).json({
-    message: 'Circle created successfully',
-    circle
-  });
+    res.status(201).json({
+      message: 'Circle created successfully',
+      circle
+    });
   } catch (err) {
     console.error('Create circle catch error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -92,38 +102,37 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-  // We check if the user requesting is part of this circle, though RLS does it too.
-  if (req.user.circle_id && req.user.circle_id !== id) {
-    // If local token has a different circle_id, be careful. But let RLS handle it if using user's token.
-    // Wait, we are using SERVICE_ROLE_KEY in supabase client above! We should do manual checks or use RLS.
-    // We'll do manual check.
-  }
+    try {
+      assertCircleMember(req, id);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    }
 
-  const { data: circle, error: circleError } = await supabase
-    .from('circles')
-    .select('*')
-    .eq('id', id)
-    .single();
+    const { data: circle, error: circleError } = await supabase
+      .from('circles')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-  if (circleError) {
-    console.error('Get circle error:', circleError);
-    return res.status(404).json({ error: 'Circle not found' });
-  }
+    if (circleError) {
+      console.error('Get circle error:', circleError);
+      return res.status(404).json({ error: 'Circle not found' });
+    }
 
-  const { data: members, error: membersError } = await supabase
-    .from('users')
-    .select('id, name, role')
-    .eq('circle_id', id);
+    const { data: members, error: membersError } = await supabase
+      .from('users')
+      .select('id, name, role')
+      .eq('circle_id', id);
 
-  if (membersError) {
-    console.error('Get circle members error:', membersError);
-    return res.status(500).json({ error: membersError.message });
-  }
+    if (membersError) {
+      console.error('Get circle members error:', membersError);
+      return res.status(500).json({ error: membersError.message });
+    }
 
-  res.status(200).json({
-    circle,
-    members
-  });
+    res.status(200).json({
+      circle,
+      members
+    });
   } catch (err) {
     console.error('Get circle catch error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -136,25 +145,31 @@ router.post('/:id/invite', async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
 
-  if (!role || !['Admin', 'Caregiver', 'Viewer', 'Patient'].includes(role)) {
-    return res.status(400).json({ error: 'Valid role is required' });
-  }
+    try {
+      assertCircleRole(req, id, ['Admin']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Only circle Admins can generate invites' });
+    }
 
-  // Create an invite token using JWT
-  const invitePayload = {
-    circle_id: id,
-    role: role,
-    type: 'invite'
-  };
+    if (!role || !['Admin', 'Caregiver', 'Viewer', 'Patient'].includes(role)) {
+      return res.status(400).json({ error: 'Valid role is required' });
+    }
 
-  const inviteToken = jwt.sign(invitePayload, process.env.JWT_SECRET, { expiresIn: '7d' });
-  const inviteCode = Buffer.from(inviteToken).toString('base64');
+    // Create an invite token using JWT
+    const invitePayload = {
+      circle_id: id,
+      role: role,
+      type: 'invite'
+    };
 
-  res.status(200).json({
-    message: 'Invite generated',
-    inviteCode,
-    role
-  });
+    const inviteToken = jwt.sign(invitePayload, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const inviteCode = Buffer.from(inviteToken).toString('base64');
+
+    res.status(200).json({
+      message: 'Invite generated',
+      inviteCode,
+      role
+    });
   } catch (err) {
     console.error('Generate invite catch error:', err);
     return res.status(500).json({ error: 'Internal server error' });
@@ -207,6 +222,14 @@ router.post('/join', async (req, res) => {
       return res.status(500).json({ error: userError.message });
     }
 
+    // Explicitly insert into circle_memberships
+    await supabase.from('circle_memberships').upsert([{
+      user_id,
+      circle_id: circle.id,
+      role,
+      status: 'active'
+    }]);
+
     res.status(200).json({
       message: 'Joined circle successfully',
       circle_id: circle.id,
@@ -222,14 +245,29 @@ router.post('/join', async (req, res) => {
 // 5. Remove member from circle
 router.delete('/:id/members/:memberId', async (req, res) => {
   const { id, memberId } = req.params;
-  const userCircleId = req.user.circle_id;
-  const userRole = req.user.role; // Assuming role is available
-
-  if (String(id) !== String(userCircleId)) {
-    return res.status(403).json({ error: 'Unauthorized access to this circle' });
-  }
 
   try {
+    try {
+      assertCircleRole(req, id, ['Admin']);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Only circle Admins can remove members' });
+    }
+
+    // Prevent removing the last admin of a circle (CC-005)
+    const { data: admins, error: adminErr } = await supabase
+      .from('users')
+      .select('id')
+      .eq('circle_id', id)
+      .eq('role', 'Admin');
+
+    if (adminErr) {
+      return res.status(500).json({ error: 'Failed to verify admin count' });
+    }
+
+    if (admins && admins.length === 1 && String(admins[0].id) === String(memberId)) {
+      return res.status(400).json({ error: 'Cannot remove the last Admin of the circle' });
+    }
+
     const { error } = await supabase
       .from('users')
       .update({ circle_id: null })
@@ -240,6 +278,8 @@ router.delete('/:id/members/:memberId', async (req, res) => {
       console.error('Remove member error:', error);
       return res.status(500).json({ error: error.message });
     }
+
+    await supabase.from('circle_memberships').update({ status: 'deactivated' }).eq('user_id', memberId).eq('circle_id', id);
 
     res.status(200).json({ message: 'Member removed successfully' });
   } catch (err) {

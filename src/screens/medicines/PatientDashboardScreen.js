@@ -10,6 +10,7 @@ import { THEME } from '../../styles/theme';
 import { Ionicons } from '@expo/vector-icons';
 import EmptyState from '../../components/EmptyState';
 import VoiceLogButton from '../../components/VoiceLogButton';
+import { useStore } from '../../store/useStore';
 
 const PatientDashboardScreen = ({ navigation }) => {
   const currentCircle = useStore(state => state.currentCircle);
