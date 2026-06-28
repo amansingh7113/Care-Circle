@@ -30,7 +30,7 @@ BEGIN
     ) THEN
         CREATE POLICY "circle_budgets_isolation_policy" ON circle_budgets
             FOR ALL
-            USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+            USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
     END IF;
 
     IF NOT EXISTS (
@@ -38,7 +38,7 @@ BEGIN
     ) THEN
         CREATE POLICY "notifications_isolation_policy" ON notifications
             FOR ALL
-            USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+            USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
     END IF;
 
     IF NOT EXISTS (
@@ -46,7 +46,7 @@ BEGIN
     ) THEN
         CREATE POLICY "ai_insights_history_isolation_policy" ON ai_insights_history
             FOR ALL
-            USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+            USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
     END IF;
 END
 $$;

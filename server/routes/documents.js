@@ -148,7 +148,7 @@ router.get('/circle/:circleId', async (req, res) => {
     res.json(data || []);
   } catch (error) {
     console.error('Error fetching documents [REDACTED]');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to fetch documents.' });
   }
 });
 
@@ -194,7 +194,7 @@ router.post('/', async (req, res) => {
     res.status(201).json(data);
   } catch (error) {
     console.error('Error adding document [REDACTED]');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to add document.' });
   }
 });
 
@@ -269,7 +269,7 @@ router.post('/upload-url', async (req, res) => {
     res.status(200).json({ signedUrl: data.signedUrl, token: data.token, filePath, maxFileSize: '10MB' });
   } catch (error) {
     console.error('Error generating upload URL [REDACTED]');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to generate upload URL.' });
   }
 });
 
@@ -320,7 +320,7 @@ router.delete('/:id', async (req, res) => {
     res.status(204).send();
   } catch (error) {
     console.error('Error deleting document [REDACTED]');
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: 'Failed to delete document.' });
   }
 });
 

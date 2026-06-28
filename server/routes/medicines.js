@@ -75,7 +75,7 @@ router.post('/', async (req, res) => {
 
     if (error) {
       console.error('Add medicine error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to add medicine.' });
     }
 
     res.status(201).json(data);
@@ -185,7 +185,7 @@ router.get('/circles/:circleId/medicines', async (req, res) => {
 
     if (error) {
       console.error('Get medicines error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to fetch medicines.' });
     }
 
     // Fetch today's logs to determine status
@@ -320,7 +320,7 @@ router.post('/:id/logs', async (req, res) => {
 
     if (error) {
       console.error('Log medicine error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to log medicine.' });
     }
 
     // Stock decrement logic
@@ -393,7 +393,7 @@ router.get('/:id/logs', async (req, res) => {
 
     if (error) {
       console.error('Get medicine logs error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to get medicine logs.' });
     }
 
     res.status(200).json(data);
@@ -431,7 +431,7 @@ router.delete('/:id', async (req, res) => {
 
     if (error) {
       console.error('Delete medicine error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to delete medicine.' });
     }
 
     res.status(200).json({ message: 'Medicine deleted successfully' });
@@ -469,7 +469,7 @@ router.patch('/:id/archive', async (req, res) => {
 
     if (error) {
       console.error('Archive medicine error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to archive medicine.' });
     }
 
     res.status(200).json({ message: 'Medicine archived successfully' });
@@ -668,7 +668,7 @@ router.get('/analytics/compliance', async (req, res) => {
       .eq('circle_id', circleId)
       .gte('taken_at', thirtyDaysAgo.toISOString());
 
-    if (logsError) return res.status(400).json({ error: logsError.message });
+    if (logsError) return res.status(400).json({ error: 'Failed to fetch compliance logs.' });
 
     const logs30d = logs;
     const logs7d = logs.filter(l => new Date(l.taken_at) >= sevenDaysAgo);
@@ -759,7 +759,7 @@ router.patch('/:id', async (req, res) => {
 
     if (error) {
       console.error('Update medicine error [REDACTED]');
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to update medicine.' });
     }
 
     res.status(200).json(data);

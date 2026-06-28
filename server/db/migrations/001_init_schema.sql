@@ -58,24 +58,24 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 -- Circles Policy
 CREATE POLICY "circle_isolation_policy" ON circles
     FOR ALL
-    USING (id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+    USING (id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
 
 -- Users Policy
 CREATE POLICY "user_isolation_policy" ON users
     FOR ALL
-    USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+    USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
 
 -- Medicines Policy
 CREATE POLICY "medicine_isolation_policy" ON medicines
     FOR ALL
-    USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+    USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
 
 -- Medicine Dose Logs Policy
 CREATE POLICY "dose_log_isolation_policy" ON medicine_dose_logs
     FOR ALL
-    USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+    USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));
 
 -- Tasks Policy
 CREATE POLICY "task_isolation_policy" ON tasks
     FOR ALL
-    USING (circle_id = (SELECT circle_id FROM users WHERE id = auth.uid()));
+    USING (circle_id = (SELECT circle_id FROM users WHERE id = (SELECT auth.uid())));

@@ -9,6 +9,7 @@ const supabaseAdmin = createClient(
 );
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 
 router.use(authenticate);
 
@@ -36,6 +37,12 @@ router.use(ensureCircleId);
 // GET / - Fetch notifications for user's circle
 router.get('/', async (req, res) => {
   try {
+    try {
+      assertCircleMember(req, req.user.circle_id);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle notifications' });
+    }
+
     const { data: notifications, error } = await supabaseAdmin
       .from('notifications')
       .select('*')
@@ -79,7 +86,13 @@ router.patch('/:id/read', async (req, res) => {
       .eq('id', id)
       .single();
       
-    if (!notif || String(notif.circle_id) !== String(req.user.circle_id)) {
+    if (!notif) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+
+    try {
+      assertCircleMember(req, notif.circle_id);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -101,6 +114,12 @@ router.patch('/:id/read', async (req, res) => {
 // PATCH /read-all - Mark all notifications for the circle as read
 router.patch('/read-all', async (req, res) => {
   try {
+    try {
+      assertCircleMember(req, req.user.circle_id);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
     const { error } = await supabaseAdmin
       .from('notifications')
       .update({ is_read: true })
@@ -138,6 +157,11 @@ router.post('/push-token', async (req, res) => {
 router.post('/sos', async (req, res) => {
   try {
     const circleId = req.user.circle_id;
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
     const patientName = req.user.name || 'A Patient';
 
     const { error } = await supabaseAdmin

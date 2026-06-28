@@ -25,7 +25,7 @@ router.post('/send-otp', async (req, res) => {
     });
 
     if (error) {
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to send OTP. Please verify the phone number.' });
     }
 
     res.status(200).json({ success: true, message: 'OTP sent successfully', data });
@@ -51,7 +51,7 @@ router.post('/verify-otp', async (req, res) => {
     });
 
     if (authError) {
-      return res.status(401).json({ error: authError.message });
+      return res.status(401).json({ error: 'Invalid or expired OTP.' });
     }
 
     // Fetch user profile from public.users table or similar to get role and circle status
@@ -117,7 +117,7 @@ router.get('/google', async (req, res) => {
     });
 
     if (error) {
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Google OAuth sign-in failed.' });
     }
 
     res.status(200).json({ url: data.url });
@@ -136,7 +136,7 @@ router.post('/exchange-session', async (req, res) => {
     // Verify Supabase token
     const { data: { user }, error } = await supabase.auth.getUser(access_token);
     if (error || !user) {
-      return res.status(401).json({ error: error?.message || 'Invalid token' });
+      return res.status(401).json({ error: 'Invalid or expired token.' });
     }
 
     // Fetch user profile from public.users table or similar to get role and circle status
@@ -242,7 +242,7 @@ router.post('/register-email', async (req, res) => {
     });
 
     if (authError) {
-      return res.status(400).json({ error: authError.message });
+      return res.status(400).json({ error: 'Registration failed. Email may already be in use or invalid.' });
     }
 
     if (!authData.user) {
@@ -306,7 +306,7 @@ router.post('/login-email', async (req, res) => {
     });
 
     if (authError) {
-      return res.status(401).json({ error: authError.message });
+      return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
     // Fetch user profile from public.users table

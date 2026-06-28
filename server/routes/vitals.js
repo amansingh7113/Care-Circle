@@ -10,13 +10,16 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 router.use(authenticate);
 
 // GET vitals for a circle
 router.get('/:circleId', async (req, res) => {
   try {
     const { circleId } = req.params;
-    if (String(circleId) !== String(req.user.circle_id)) {
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Unauthorized access to this circle vitals' });
     }
     
@@ -43,7 +46,9 @@ router.post('/', async (req, res) => {
     if (!circle_id || !systolic || !diastolic) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    if (String(circle_id) !== String(req.user.circle_id)) {
+    try {
+      assertCircleMember(req, circle_id);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Unauthorized to add vitals to this circle' });
     }
 
@@ -84,7 +89,9 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vital log not found' });
     }
 
-    if (String(existingLog.circle_id) !== String(req.user.circle_id)) {
+    try {
+      assertCircleMember(req, existingLog.circle_id);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Forbidden: You do not have access to update this vital log' });
     }
 
@@ -118,7 +125,9 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vital log not found' });
     }
 
-    if (String(existingLog.circle_id) !== String(req.user.circle_id)) {
+    try {
+      assertCircleMember(req, existingLog.circle_id);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Forbidden: You do not have access to delete this vital log' });
     }
 

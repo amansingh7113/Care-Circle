@@ -3,6 +3,7 @@ const router = express.Router();
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabase = createClient(
@@ -11,15 +12,14 @@ const supabase = createClient(
 );
 
 // Initialize Razorpay client
-// Using test credentials if env variables are missing for development
-const key_id = process.env.RAZORPAY_KEY_ID || (process.env.NODE_ENV === 'production' ? null : 'rzp_test_YourTestKeyHere');
-const key_secret = process.env.RAZORPAY_KEY_SECRET || (process.env.NODE_ENV === 'production' ? null : 'YourTestSecretHere');
+const key_id = process.env.RAZORPAY_KEY_ID;
+const key_secret = process.env.RAZORPAY_KEY_SECRET;
 
-if (process.env.NODE_ENV === 'production' && (!key_id || !key_secret)) {
-  throw new Error('Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in production');
+if (!key_id || !key_secret) {
+  console.warn('Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET');
 }
 
-const razorpay = new Razorpay({ key_id, key_secret });
+const razorpay = new Razorpay({ key_id: key_id || 'rzp_test_dummy', key_secret: key_secret || 'dummy_secret' });
 
 // Endpoint to create a Razorpay order
 router.post('/create-order', authenticate, async (req, res) => {
@@ -27,6 +27,11 @@ router.post('/create-order', authenticate, async (req, res) => {
     const circle_id = req.user.circle_id;
     if (!circle_id) {
       return res.status(403).json({ success: false, error: 'No circle_id provided' });
+    }
+    try {
+      assertCircleMember(req, circle_id);
+    } catch (authErr) {
+      return res.status(403).json({ success: false, error: 'Unauthorized access to this circle' });
     }
 
     // Fixed price for premium family plan as per GEMINI.md (CC-006)
@@ -74,6 +79,11 @@ router.post('/verify', authenticate, async (req, res) => {
     
     if (!circle_id) {
       return res.status(403).json({ success: false, error: 'No circle_id provided' });
+    }
+    try {
+      assertCircleMember(req, circle_id);
+    } catch (authErr) {
+      return res.status(403).json({ success: false, error: 'Unauthorized access to this circle' });
     }
 
     // Query razorpay_orders table to verify order binding and prevent reuse (CC-006)

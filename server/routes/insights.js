@@ -134,9 +134,14 @@ router.post('/generate-manual', async (req, res) => {
       supabase.from('medicine_dose_logs').select('status, taken_at').eq('circle_id', circleId).gte('taken_at', thirtyDaysAgoIso)
     ]);
 
+    const sanitizeNotes = (list) => (list || []).map(item => ({
+      ...item,
+      notes: item.notes ? item.notes.replace(/\b[A-Z][a-z]+\b/g, '[REDACTED]') : undefined
+    }));
+
     const telemetry = {
       steps: stepsRes.data || [],
-      sleep: sleepRes.data || [],
+      sleep: sanitizeNotes(sleepRes.data),
       medicines: medsRes.data || []
     };
 
@@ -230,7 +235,7 @@ router.post('/generate-manual', async (req, res) => {
     res.status(200).json(outputJson);
   } catch (error) {
     console.error('Insights generation error [REDACTED]');
-    res.status(500).json({ error: error.message || 'Failed to generate insights' });
+    res.status(500).json({ error: 'Failed to generate insights' });
   }
 });
 
@@ -350,10 +355,22 @@ router.get('/doctor-summary', async (req, res) => {
       supabase.from('doctor_visits').select('doctor_name, visit_date, reason, notes').eq('circle_id', circleId).order('visit_date', { ascending: false })
     ]);
 
+    const sanitizeNotes = (list) => (list || []).map(item => ({
+      ...item,
+      notes: item.notes ? item.notes.replace(/\b[A-Z][a-z]+\b/g, '[REDACTED]') : undefined
+    }));
+
+    const sanitizeVisits = (list) => (list || []).map(item => ({
+      ...item,
+      doctor_name: '[REDACTED]',
+      reason: item.reason ? item.reason.replace(/\b[A-Z][a-z]+\b/g, '[REDACTED]') : undefined,
+      notes: item.notes ? item.notes.replace(/\b[A-Z][a-z]+\b/g, '[REDACTED]') : undefined
+    }));
+
     const telemetry = {
-      doctor_visits: visitsRes.data || [],
+      doctor_visits: sanitizeVisits(visitsRes.data),
       steps: stepsRes.data || [],
-      sleep: sleepRes.data || [],
+      sleep: sanitizeNotes(sleepRes.data),
       medicines: medsRes.data || []
     };
 

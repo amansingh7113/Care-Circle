@@ -9,12 +9,15 @@ const supabase = createClient(
 );
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 router.use(authenticate);
 
 // 1. Fetch step logs for a circle
 router.get('/:circleId', async (req, res) => {
   const { circleId } = req.params;
-  if (String(circleId) !== String(req.user.circle_id)) {
+  try {
+    assertCircleMember(req, circleId);
+  } catch (authErr) {
     return res.status(403).json({ error: 'Unauthorized access to this circle step logs' });
   }
   const requestedLimit = parseInt(req.query.limit, 10);
@@ -30,7 +33,7 @@ router.get('/:circleId', async (req, res) => {
 
     if (error) {
       console.error('Fetch step logs error:', error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Failed to fetch step logs.' });
     }
 
     res.status(200).json(logs);
@@ -48,7 +51,9 @@ router.post('/', async (req, res) => {
   if (!circle_id || !date || step_count === undefined) {
     return res.status(400).json({ error: 'Missing required fields: circle_id, date, step_count' });
   }
-  if (String(circle_id) !== String(req.user.circle_id)) {
+  try {
+    assertCircleMember(req, circle_id);
+  } catch (authErr) {
     return res.status(403).json({ error: 'Unauthorized to add step logs to this circle' });
   }
 
@@ -63,7 +68,7 @@ router.post('/', async (req, res) => {
 
     if (findError) {
       console.error('Find step log error:', findError);
-      return res.status(500).json({ error: findError.message });
+      return res.status(500).json({ error: 'Failed to find step log.' });
     }
 
     if (existing && existing.length > 0) {
@@ -77,7 +82,7 @@ router.post('/', async (req, res) => {
 
       if (updateError) {
         console.error('Update step log error:', updateError);
-        return res.status(500).json({ error: updateError.message });
+        return res.status(500).json({ error: 'Failed to update step log.' });
       }
       return res.status(200).json(log);
     } else {
@@ -90,7 +95,7 @@ router.post('/', async (req, res) => {
 
       if (insertError) {
         console.error('Insert step log error:', insertError);
-        return res.status(500).json({ error: insertError.message });
+        return res.status(500).json({ error: 'Failed to insert step log.' });
       }
       return res.status(200).json(log);
     }

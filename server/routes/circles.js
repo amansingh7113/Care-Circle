@@ -25,7 +25,7 @@ router.get('/', async (req, res) => {
 
     if (error) {
       console.error('Fetch circles error:', error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Failed to fetch circles.' });
     }
 
     const circles = userRecords.filter(r => r.circles).map(record => ({
@@ -61,7 +61,7 @@ router.post('/', async (req, res) => {
 
     if (circleError) {
       console.error('Create circle error:', circleError);
-      return res.status(500).json({ error: circleError.message });
+      return res.status(500).json({ error: 'Failed to create circle.' });
     }
 
     // Upsert the user into the users table with 'Admin' role
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
 
     if (userError) {
       console.error('Upsert user admin role error:', userError);
-      return res.status(500).json({ error: userError.message });
+      return res.status(500).json({ error: 'Failed to assign admin role.' });
     }
 
     // Explicitly insert into circle_memberships
@@ -126,7 +126,7 @@ router.get('/:id', async (req, res) => {
 
     if (membersError) {
       console.error('Get circle members error:', membersError);
-      return res.status(500).json({ error: membersError.message });
+      return res.status(500).json({ error: 'Failed to fetch circle members.' });
     }
 
     res.status(200).json({
@@ -219,7 +219,7 @@ router.post('/join', async (req, res) => {
 
     if (userError) {
       console.error('Join circle user upsert error:', userError);
-      return res.status(500).json({ error: userError.message });
+      return res.status(500).json({ error: 'Failed to join circle.' });
     }
 
     // Explicitly insert into circle_memberships
@@ -276,7 +276,7 @@ router.delete('/:id/members/:memberId', async (req, res) => {
 
     if (error) {
       console.error('Remove member error:', error);
-      return res.status(500).json({ error: error.message });
+      return res.status(500).json({ error: 'Failed to remove member.' });
     }
 
     await supabase.from('circle_memberships').update({ status: 'deactivated' }).eq('user_id', memberId).eq('circle_id', id);

@@ -42,7 +42,7 @@ router.post('/', async (req, res) => {
       ])
       .select();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return res.status(500).json({ error: 'Failed to create expense.' });
     return res.status(201).json({ data: data[0] });
 
   } catch (err) {
@@ -74,7 +74,7 @@ router.get('/summary', async (req, res) => {
       .gte('created_at', startOfMonth)
       .lte('created_at', endOfMonth);
 
-    if (expensesError) return res.status(500).json({ error: expensesError.message });
+    if (expensesError) return res.status(500).json({ error: 'Failed to fetch expenses summary.' });
 
     const { data: budgetData, error: budgetError } = await supabase
       .from('circle_budgets')
@@ -124,7 +124,7 @@ router.delete('/:id', async (req, res) => {
 
     if (error) {
       console.error('Delete expense error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to delete expense.' });
     }
 
     res.status(200).json({ message: 'Expense deleted successfully' });

@@ -9,13 +9,16 @@ const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABAS
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 router.use(authenticate);
 
 // GET sleep logs for a circle
 router.get('/:circleId', async (req, res) => {
   try {
     const { circleId } = req.params;
-    if (String(circleId) !== String(req.user.circle_id)) {
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Unauthorized access to this circle sleep logs' });
     }
     
@@ -42,7 +45,9 @@ router.post('/', async (req, res) => {
     if (!circle_id || !sleep_start || !sleep_end) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
-    if (String(circle_id) !== String(req.user.circle_id)) {
+    try {
+      assertCircleMember(req, circle_id);
+    } catch (authErr) {
       return res.status(403).json({ error: 'Unauthorized to add sleep logs to this circle' });
     }
 

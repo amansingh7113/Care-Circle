@@ -44,6 +44,7 @@ router.post('/scan', upload.single('image'), async (req, res) => {
 
     if (userCircleId) {
       try {
+        assertCircleMember(req, userCircleId);
         await checkAiQuota(userCircleId);
       } catch (quotaErr) {
         return res.status(429).json({ error: quotaErr.message });

@@ -69,7 +69,7 @@ router.post('/', async (req, res) => {
 
     if (error) {
       console.error('Create task error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to create task.' });
     }
 
     res.status(201).json(data);
@@ -104,7 +104,7 @@ router.get('/circles/:circleId/tasks', async (req, res) => {
 
     if (error) {
       console.error('Get tasks error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to get tasks.' });
     }
 
     res.status(200).json(data);
@@ -166,7 +166,7 @@ router.patch('/:id', async (req, res) => {
 
     if (error) {
       console.error('Update task error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to update task.' });
     }
 
     res.status(200).json(data);
@@ -218,7 +218,7 @@ router.post('/:id/comments', async (req, res) => {
 
     if (error) {
       console.error('Add task comment error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to add task comment.' });
     }
 
     res.status(201).json(data);
@@ -257,7 +257,7 @@ router.get('/:id/comments', async (req, res) => {
 
     if (error) {
       console.error('Get task comments error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to get task comments.' });
     }
 
     const formattedComments = (comments || []).map(c => {
@@ -305,7 +305,7 @@ router.delete('/:id', async (req, res) => {
 
     if (error) {
       console.error('Delete task error:', error);
-      return res.status(400).json({ error: error.message });
+      return res.status(400).json({ error: 'Failed to delete task.' });
     }
 
     res.status(200).json({ message: 'Task deleted successfully' });

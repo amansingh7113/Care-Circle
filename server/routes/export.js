@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { createClient } = require('@supabase/supabase-js');
 const authenticate = require('../middleware/authenticate');
+const { assertCircleMember } = require('../middleware/authorizer');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -16,6 +17,12 @@ router.get('/report', async (req, res) => {
     if (!circleId) {
       return res.status(400).json({ error: 'User does not belong to a circle' });
     }
+    try {
+      assertCircleMember(req, circleId);
+    } catch (authErr) {
+      return res.status(403).json({ error: 'Unauthorized access to this circle' });
+    }
+
 
     const months = parseInt(req.query.months, 10) || 1;
     const startDate = new Date();

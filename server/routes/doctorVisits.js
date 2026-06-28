@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
     res.status(201).json({ data: data && data.length > 0 ? data[0] : null });
   } catch (err) {
     console.error('Add doctor visit error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to add doctor visit.' });
   }
 });
 
@@ -85,7 +85,7 @@ router.get('/', async (req, res) => {
     res.status(200).json({ data: data || [] });
   } catch (err) {
     console.error('Get doctor visits error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to get doctor visits.' });
   }
 });
 
@@ -140,7 +140,7 @@ router.delete('/:id', async (req, res) => {
     res.status(200).json({ message: 'Doctor visit deleted successfully' });
   } catch (err) {
     console.error('Delete doctor visit error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to delete doctor visit.' });
   }
 });
 
@@ -193,7 +193,7 @@ router.patch('/:id', async (req, res) => {
     res.json({ data });
   } catch (err) {
     console.error('Update doctor visit error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Failed to update doctor visit.' });
   }
 });
 
