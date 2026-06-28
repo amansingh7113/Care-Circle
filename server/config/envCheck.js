@@ -8,7 +8,7 @@ const validateEnv = () => {
     'GEMINI_API_KEY'
   ];
 
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' && process.env.REQUIRE_RAZORPAY === 'true') {
     requiredKeys.push('RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET');
   }
 
