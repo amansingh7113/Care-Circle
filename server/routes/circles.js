@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
     // Fetch from both legacy users table and circle_memberships table
     const { data: userRecords, error } = await supabase
       .from('users')
-      .select('circle_id, role, circles(id, name, is_premium)')
+      .select('circle_id, role, circles!users_circle_id_fkey(id, name, is_premium)')
       .eq('id', user_id);
 
     if (error) {

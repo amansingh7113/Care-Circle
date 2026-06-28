@@ -22,9 +22,11 @@ async function runMigration() {
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
           UNIQUE(circle_id, date)
       );
+      ALTER TABLE step_logs ADD COLUMN IF NOT EXISTS patient_id UUID REFERENCES users(id) ON DELETE CASCADE;
+      NOTIFY pgrst, 'reload schema';
     `);
     
-    console.log('Migration successful: Created step_logs table.');
+    console.log('Migration successful: Updated step_logs table and reloaded PostgREST schema cache.');
   } catch (error) {
     console.error('Migration failed:', error);
   } finally {

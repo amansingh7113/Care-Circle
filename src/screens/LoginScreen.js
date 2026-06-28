@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { sendOtp, exchangeSession } from '../services/authApi';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
@@ -134,7 +135,7 @@ const LoginScreen = ({ navigation }) => {
     setGoogleLoading(true);
     console.log('Initiating Google Login...');
     try {
-      const redirectUri = Linking.createURL('auth');
+      const redirectUri = AuthSession.makeRedirectUri();
       console.log('Using dynamic Redirect URI:', redirectUri);
       
       const { data, error } = await supabase.auth.signInWithOAuth({

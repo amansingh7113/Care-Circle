@@ -89,7 +89,7 @@ router.post('/', async (req, res) => {
       // Insert new record
       const { data: log, error: insertError } = await supabase
         .from('step_logs')
-        .insert([{ circle_id, date, step_count }])
+        .insert([{ circle_id, patient_id, date, step_count }])
         .select()
         .single();
 
