@@ -88,6 +88,8 @@ const CircleSelectionScreen = ({ navigation }) => {
         useStore.getState().setCircle(item);
         navigation.navigate('Dashboard', { circleId: item.id, circleName: item.name });
       }}
+      accessibilityRole="button"
+      accessibilityLabel={`Select circle ${item.name}`}
     >
       <View style={styles.circleAvatar}>
         <Users size={28} color={THEME.colors.primary} />
@@ -111,11 +113,11 @@ const CircleSelectionScreen = ({ navigation }) => {
     >
       <ScrollView contentContainerStyle={{flexGrow: 1}} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.topSection}>
-        <Text style={styles.welcomeText}>WELCOME, {user?.name?.toUpperCase() || 'USER'}</Text>
-        {/* Placeholder for top vector graphic */}
-        <View style={styles.graphicPlaceholder}>
-          <Users size={80} color={THEME.colors.alert} />
+        <View style={styles.logoBadge}>
+          <Users size={36} color={THEME.colors.primary} />
         </View>
+        <Text style={styles.welcomeText}>Welcome, {user?.name || 'User'}</Text>
+        <Text style={styles.subtitleText}>Select a circle to continue or create a new one</Text>
       </View>
 
       <View style={styles.midSection}>
@@ -140,6 +142,28 @@ const CircleSelectionScreen = ({ navigation }) => {
           <Text style={styles.cardTitle}>
             {mode === 'join' ? 'JOIN YOUR CARE CIRCLE' : 'CREATE A CARE CIRCLE'}
           </Text>
+
+          {/* Top Segmented Control */}
+          <View style={styles.segmentedControl}>
+            <TouchableOpacity
+              style={[styles.segmentButton, mode === 'join' && styles.segmentButtonActive]}
+              onPress={() => { setMode('join'); setInputValue(''); }}
+              accessibilityRole="button"
+              accessibilityLabel="Switch to Join Circle mode"
+              accessibilityState={{ selected: mode === 'join' }}
+            >
+              <Text style={[styles.segmentText, mode === 'join' && styles.segmentTextActive]}>Join Circle</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.segmentButton, mode === 'create' && styles.segmentButtonActive]}
+              onPress={() => { setMode('create'); setInputValue(''); }}
+              accessibilityRole="button"
+              accessibilityLabel="Switch to Create Circle mode"
+              accessibilityState={{ selected: mode === 'create' }}
+            >
+              <Text style={[styles.segmentText, mode === 'create' && styles.segmentTextActive]}>Create Circle</Text>
+            </TouchableOpacity>
+          </View>
           
           <View style={[styles.inputContainer, isFocused && styles.inputFocused]}>
             {mode === 'join' ? (
@@ -156,6 +180,7 @@ const CircleSelectionScreen = ({ navigation }) => {
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
               autoCapitalize={mode === 'join' ? 'characters' : 'words'}
+              accessibilityLabel={mode === 'join' ? "Enter Invite Code" : "New Circle Name"}
             />
           </View>
 
@@ -163,6 +188,9 @@ const CircleSelectionScreen = ({ navigation }) => {
             style={styles.primaryButton} 
             onPress={handleSubmit}
             disabled={isSubmitting}
+            accessibilityRole="button"
+            accessibilityLabel={mode === 'join' ? 'Join Circle' : 'Create Circle'}
+            accessibilityState={{ disabled: isSubmitting }}
           >
             {isSubmitting ? (
               <ActivityIndicator color="#FFF" />
@@ -171,18 +199,6 @@ const CircleSelectionScreen = ({ navigation }) => {
                 {mode === 'join' ? 'Join Circle' : 'Create Circle'}
               </Text>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.secondaryButton} 
-            onPress={() => {
-              setMode(mode === 'join' ? 'create' : 'join');
-              setInputValue('');
-            }}
-          >
-            <Text style={styles.secondaryButtonText}>
-              {mode === 'join' ? 'Create a new Care Circle' : 'Join an existing Circle'}
-            </Text>
           </TouchableOpacity>
         </View>
 
@@ -203,21 +219,29 @@ const styles = StyleSheet.create({
     height: '35%',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
-    paddingTop: 80,
+    paddingTop: 60,
     alignItems: 'center',
     zIndex: 2,
+  },
+  logoBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: THEME.colors.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   welcomeText: {
     color: THEME.colors.white,
     fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginBottom: 20,
+    fontWeight: '700',
+    marginBottom: 8,
   },
-  graphicPlaceholder: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  subtitleText: {
+    ...THEME.typography.subtext,
+    color: THEME.colors.textMuted,
+    marginBottom: 20,
   },
   midSection: {
     height: 140,
@@ -275,13 +299,41 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0.5,
   },
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: THEME.colors.canvas,
+    borderRadius: THEME.borderRadius.badge,
+    padding: 4,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 12,
+    minHeight: 48,
+    borderRadius: THEME.borderRadius.badge,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  segmentButtonActive: {
+    backgroundColor: THEME.colors.primary,
+  },
+  segmentText: {
+    ...THEME.typography.cardTitle,
+    fontSize: 14,
+    color: THEME.colors.textMuted,
+  },
+  segmentTextActive: {
+    color: THEME.colors.white,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: THEME.colors.border,
     borderRadius: THEME.borderRadius.badge,
-    height: 56,
+    minHeight: 56,
     paddingHorizontal: 16,
     marginBottom: 20,
     backgroundColor: THEME.colors.canvas
@@ -292,12 +344,12 @@ const styles = StyleSheet.create({
   inputIcon: { marginRight: 12 },
   input: { 
     flex: 1,
-    height: '100%',
+    minHeight: 48,
     ...THEME.typography.body,
   },
   primaryButton: { 
     backgroundColor: THEME.colors.primary, 
-    height: 56,
+    minHeight: 56,
     borderRadius: THEME.borderRadius.badge, 
     justifyContent: 'center',
     alignItems: 'center',

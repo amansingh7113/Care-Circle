@@ -38,7 +38,7 @@ module.exports = defineConfig({
     {
       command: 'npx serve -s dist -p 8081',
       port: 8081,
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120000,
     }
   ],

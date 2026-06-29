@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView, SafeAreaView } from 'react-native';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, ScrollView, SafeAreaView, Animated } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getTasks, updateTaskStatus, deleteTask } from '../services/taskApi';
 import { useStore } from '../store/useStore';
@@ -17,6 +17,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('pending');
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(
     useCallback(() => {
@@ -24,7 +25,7 @@ const TaskBoardScreen = ({ route, navigation }) => {
     }, [circleId, activeTab])
   );
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (lastHeartbeat) {
       fetchTasks();
     }
@@ -47,8 +48,16 @@ const TaskBoardScreen = ({ route, navigation }) => {
     }
   };
 
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    Animated.timing(slideAnim, {
+      toValue: tab === 'pending' ? 0 : 1,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  };
+
   const handleUpdateStatus = async (taskId, newStatus) => {
-    // Optimistic update
     setTasks(prev => prev.filter(t => t.id !== taskId));
     try {
       await updateTaskStatus(taskId, { status: newStatus });
@@ -91,6 +100,8 @@ const TaskBoardScreen = ({ route, navigation }) => {
       onPress={() => navigation.navigate('TaskDetail', { task: item })}
       onLongPress={() => handleDeleteTask(item.id)}
       activeOpacity={0.8}
+      accessibilityRole="button"
+      accessibilityLabel={`Task: ${item.title}, due ${item.due_date || 'N/A'}`}
     >
       <View style={styles.cardContent}>
         <View style={styles.cardInfo}>
@@ -103,11 +114,29 @@ const TaskBoardScreen = ({ route, navigation }) => {
           </View>
         </View>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={() => navigation.navigate('CreateTask', { circleId, taskToEdit: item })} style={{marginRight: 12}}>
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('CreateTask', { circleId, taskToEdit: item })} 
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit task ${item.title}`}
+          >
             <Ionicons name="pencil" size={20} color={THEME.colors.textMuted} />
           </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={() => handleDeleteTask(item.id)} 
+            style={styles.actionBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete task ${item.title}`}
+          >
+            <Ionicons name="trash-outline" size={20} color={THEME.colors.alert} />
+          </TouchableOpacity>
           {activeTab === 'pending' ? (
-             <TouchableOpacity style={styles.completionBadge} onPress={() => handleUpdateStatus(item.id, 'completed')}>
+             <TouchableOpacity 
+               style={styles.completionBadge} 
+               onPress={() => handleUpdateStatus(item.id, 'completed')}
+               accessibilityRole="button"
+               accessibilityLabel={`Mark task ${item.title} as completed`}
+             >
                <Ionicons name="checkmark" size={20} color={THEME.colors.primary} />
              </TouchableOpacity>
           ) : (
@@ -120,7 +149,6 @@ const TaskBoardScreen = ({ route, navigation }) => {
     </TouchableOpacity>
   );
 
-  // Grouping logic for UI
   const groupedTasks = tasks.reduce((acc, task) => {
     let group = 'TODAY';
     if (task.due_date && task.due_date.toLowerCase().includes('tomorrow')) group = 'TOMORROW';
@@ -147,26 +175,48 @@ const TaskBoardScreen = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.headerRow}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={24} color={THEME.colors.white} />
+          <TouchableOpacity 
+            style={styles.backBtn} 
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="arrow-back" size={24} color={THEME.colors.textHeader} />
           </TouchableOpacity>
           <Text style={styles.header}>Task Board</Text>
         </View>
-        <TouchableOpacity style={styles.addBtn} onPress={() => navigation.navigate('CreateTask', { circleId })}>
+        <TouchableOpacity 
+          style={styles.addBtn} 
+          onPress={() => navigation.navigate('CreateTask', { circleId })}
+          accessibilityRole="button"
+          accessibilityLabel="Create new task"
+        >
           <Text style={styles.addBtnText}>+ New</Text>
         </TouchableOpacity>
       </View>
       
       <View style={styles.tabContainer}>
+        <Animated.View style={[styles.tabIndicator, {
+          left: slideAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: ['0%', '50%']
+          })
+        }]} />
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'pending' && styles.activeTab]} 
-          onPress={() => setActiveTab('pending')}
+          style={styles.tab} 
+          onPress={() => switchTab('pending')}
+          accessibilityRole="button"
+          accessibilityLabel="Pending tasks tab"
+          accessibilityState={{ selected: activeTab === 'pending' }}
         >
           <Text style={[styles.tabText, activeTab === 'pending' && styles.activeTabText]}>Pending</Text>
         </TouchableOpacity>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'completed' && styles.activeTab]} 
-          onPress={() => setActiveTab('completed')}
+          style={styles.tab} 
+          onPress={() => switchTab('completed')}
+          accessibilityRole="button"
+          accessibilityLabel="Completed tasks tab"
+          accessibilityState={{ selected: activeTab === 'completed' }}
         >
           <Text style={[styles.tabText, activeTab === 'completed' && styles.activeTabText]}>Completed</Text>
         </TouchableOpacity>
@@ -189,41 +239,43 @@ const TaskBoardScreen = ({ route, navigation }) => {
         </ScrollView>
       )}
 
-      {/* Base Illustration Anchor */}
-      <View style={styles.bottomIllustration}>
-         <View style={styles.illustrationPlaceholder}>
-            <Text style={{fontSize: 50}}>👩🏽‍⚕️🧑🏻‍⚕️👨🏾‍⚕️</Text>
-         </View>
-      </View>
-
       <AdBanner />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.colors.deepNavy, padding: 20 },
+  container: { flex: 1, backgroundColor: THEME.colors.canvas, padding: 20 },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, marginTop: 40 },
   headerLeft: { flexDirection: 'row', alignItems: 'center' },
   backBtn: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'flex-start', marginLeft: -8, marginRight: 8 },
-  header: { ...THEME.typography.header, color: THEME.colors.white, fontSize: 28 },
+  header: { ...THEME.typography.header, color: THEME.colors.textHeader, fontSize: 28 },
   addBtn: { backgroundColor: THEME.colors.primary, paddingHorizontal: 16, minHeight: 48, justifyContent: 'center', borderRadius: 20 },
-  addBtnText: { color: THEME.colors.white, fontWeight: '700' },
+  addBtnText: { color: THEME.colors.white, fontFamily: 'Inter_700Bold', fontWeight: '700' },
   tabContainer: { 
     flexDirection: 'row', 
     marginBottom: 24, 
-    backgroundColor: '#E2E8F0', // Soft grey for unselected
+    backgroundColor: THEME.colors.border, 
     borderRadius: THEME.borderRadius.badge, 
     overflow: 'hidden',
-    padding: 4
+    padding: 4,
+    position: 'relative',
+    height: 56
   },
-  tab: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', borderRadius: THEME.borderRadius.badge },
-  activeTab: { backgroundColor: THEME.colors.primary },
+  tabIndicator: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    width: '50%',
+    backgroundColor: THEME.colors.primary,
+    borderRadius: THEME.borderRadius.badge - 2,
+  },
+  tab: { flex: 1, minHeight: 48, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   tabText: { ...THEME.typography.cardTitle, color: THEME.colors.textMuted, fontSize: 14 },
   activeTabText: { color: THEME.colors.white },
-  listContainer: { paddingBottom: 220 },
+  listContainer: { paddingBottom: 120 },
   groupHeader: {
-    color: THEME.colors.white,
+    color: THEME.colors.textHeader,
     ...THEME.typography.label,
     fontSize: 12,
     marginBottom: 12,
@@ -234,7 +286,9 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.colors.cardBg, 
     borderRadius: THEME.borderRadius.card, 
     marginBottom: 12, 
-    ...THEME.shadows.soft 
+    ...THEME.shadows.soft,
+    borderWidth: 1,
+    borderColor: THEME.colors.border
   },
   cardContent: {
     padding: 16,
@@ -247,36 +301,21 @@ const styles = StyleSheet.create({
   taskMetaRow: { flexDirection: 'row', alignItems: 'center' },
   assigneeAvatar: {
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: `${THEME.colors.secondary}20`,
+    backgroundColor: THEME.colors.primaryLight,
     justifyContent: 'center', alignItems: 'center',
     marginRight: 8
   },
-  assigneeInitial: { fontSize: 10, fontWeight: '700', color: THEME.colors.secondary },
+  assigneeInitial: { fontFamily: 'Inter_700Bold', fontSize: 10, fontWeight: '700', color: THEME.colors.primary },
   taskDetails: { ...THEME.typography.body, color: THEME.colors.textMuted, fontSize: 12 },
   actions: { marginLeft: 16, flexDirection: 'row', alignItems: 'center' },
+  actionBtn: { marginRight: 8, minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' },
   completionBadge: { 
-    width: 48, height: 48, borderRadius: 24,
+    width: 44, height: 44, borderRadius: 22,
     borderWidth: 2, borderColor: THEME.colors.primary,
     justifyContent: 'center', alignItems: 'center',
     backgroundColor: THEME.colors.cardBg
   },
   contentArea: { flex: 1 },
-  bottomIllustration: {
-    position: 'absolute',
-    bottom: 90, left: 0, right: 0,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    zIndex: -1
-  },
-  illustrationPlaceholder: {
-    backgroundColor: '#FAF6F0',
-    width: '100%',
-    height: 120,
-    borderTopLeftRadius: 100,
-    borderTopRightRadius: 100,
-    alignItems: 'center',
-    justifyContent: 'center'
-  }
 });
 
 export default TaskBoardScreen;

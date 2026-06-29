@@ -128,7 +128,7 @@ const SettingsScreen = ({ navigation }) => {
             onPress={() => navigation.navigate('PremiumUpgrade')}
           >
             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-              <Text style={{fontSize: 20, marginRight: 8}}>👑</Text>
+              <Ionicons name="sparkles" size={22} color={THEME.colors.white} style={{ marginRight: 8 }} />
               <Text style={[styles.rowButtonText, { color: THEME.colors.white, fontSize: 16 }]}>Upgrade to Premium</Text>
             </View>
           </TouchableOpacity>

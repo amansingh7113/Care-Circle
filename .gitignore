@@ -2,3 +2,32 @@ node_modules/
 .env
 .env.local
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Expo / React Native build & cache folders
+.expo/
+.expo-shared/
+dist/
+build/
+web-build/
+cache/
+coverage/
+temp/
+tmp/
+
+# iOS / Android native build folders
+ios/Pods/
+ios/build/
+android/app/build/
+android/.gradle/
+
+# IDE / System / AI tools
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+.cursor/
+.gemini/

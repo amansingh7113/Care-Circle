@@ -19,6 +19,7 @@ import { getExpensesSummary, addExpense, deleteExpense, updateExpense, updateBud
 import { useStore } from '../../store/useStore';
 import { Ionicons } from '@expo/vector-icons';
 import AdBanner from '../../components/AdBanner';
+import { THEME } from '../../styles/theme';
 
 const ExpensesScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
@@ -134,7 +135,7 @@ const ExpensesScreen = ({ navigation }) => {
     : 0;
 
   const isOverBudget = summary.total_spent > summary.monthly_limit;
-  const progressBarColor = isOverBudget ? '#D32F2F' : '#1A73E8';
+  const progressBarColor = isOverBudget ? THEME.colors.danger : THEME.colors.primary;
 
   const renderItem = ({ item }) => (
     <TouchableOpacity 
@@ -306,7 +307,7 @@ const ExpensesScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: THEME.colors.canvas,
   },
   header: {
     flexDirection: 'row',
@@ -314,14 +315,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: THEME.colors.cardBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: THEME.colors.border,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
+    ...THEME.typography.header,
+    fontSize: 22,
+    color: THEME.colors.textHeader,
   },
   backBtn: {
     minHeight: 48,
@@ -339,12 +340,12 @@ const styles = StyleSheet.create({
   },
   addIconText: {
     fontSize: 28,
-    color: '#1A73E8',
+    color: THEME.colors.primary,
     fontWeight: '400',
   },
   editBudgetBtn: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
+    backgroundColor: THEME.colors.primaryLight,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     minHeight: 48,
@@ -352,8 +353,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editBudgetBtnText: {
-    color: '#4F46E5',
-    fontWeight: '600',
+    color: THEME.colors.primary,
+    fontWeight: '700',
   },
   loader: {
     flex: 1,
@@ -361,18 +362,19 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     padding: 20,
-    backgroundColor: '#FFF',
+    backgroundColor: THEME.colors.cardBg,
     marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: THEME.colors.border,
   },
   progressText: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    ...THEME.typography.cardTitle,
     marginBottom: 10,
-    color: '#333',
+    color: THEME.colors.textHeader,
   },
   progressBarBackground: {
     height: 12,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: THEME.colors.border,
     borderRadius: 6,
     overflow: 'hidden',
   },
@@ -385,28 +387,29 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   transactionItem: {
-    backgroundColor: '#FFF',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: THEME.colors.cardBg,
+    padding: 16,
+    borderRadius: THEME.borderRadius.card,
+    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadows.soft,
   },
   transactionCategory: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    ...THEME.typography.cardTitle,
+    color: THEME.colors.textHeader,
   },
   transactionDescription: {
-    fontSize: 14,
-    color: '#666',
+    ...THEME.typography.body,
+    color: THEME.colors.textMuted,
     marginTop: 4,
   },
   transactionAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1A73E8',
+    ...THEME.typography.cardTitle,
+    color: THEME.colors.primary,
   },
   modalOverlay: {
     flex: 1,
@@ -415,25 +418,28 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalContent: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: THEME.colors.cardBg,
+    borderRadius: THEME.borderRadius.card,
+    padding: 24,
     maxHeight: '80%',
+    ...THEME.shadows.medium,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...THEME.typography.header,
+    fontSize: 20,
     marginBottom: 20,
-    color: '#333',
+    color: THEME.colors.textHeader,
   },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderColor: '#CCC',
-    borderRadius: 8,
-    paddingHorizontal: 15,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.borderRadius.input,
+    paddingHorizontal: 16,
     fontSize: 16,
     marginBottom: 20,
+    backgroundColor: THEME.colors.canvas,
+    color: THEME.colors.textHeader,
   },
   categoryPickerContainer: {
     flexDirection: 'row',
@@ -445,21 +451,23 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#CCC',
+    borderColor: THEME.colors.border,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: THEME.colors.canvas,
   },
   categoryOptionSelected: {
-    backgroundColor: '#1A73E8',
-    borderColor: '#1A73E8',
+    backgroundColor: THEME.colors.primary,
+    borderColor: THEME.colors.primary,
   },
   categoryOptionText: {
     fontSize: 14,
-    color: '#333',
+    color: THEME.colors.textMuted,
+    fontWeight: '600',
   },
   categoryOptionTextSelected: {
-    color: '#FFF',
+    color: THEME.colors.white,
   },
   modalActions: {
     flexDirection: 'row',
@@ -472,20 +480,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: THEME.borderRadius.button,
   },
   cancelButton: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: THEME.colors.surface,
   },
   cancelButtonText: {
-    color: '#333',
+    color: THEME.colors.textMuted,
     fontWeight: '600',
   },
   saveButton: {
-    backgroundColor: '#1A73E8',
+    backgroundColor: THEME.colors.primary,
   },
   saveButtonText: {
-    color: '#FFF',
+    color: THEME.colors.white,
     fontWeight: '600',
   },
 });

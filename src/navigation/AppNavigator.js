@@ -1,6 +1,9 @@
 import React, { useEffect } from 'react';
 import { AppState, View, ActivityIndicator, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { useFonts, Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useStore } from '../store/useStore';
 import CircleSelectionScreen from '../screens/CircleSelectionScreen';
 import DashboardScreen from '../screens/DashboardScreen';
@@ -26,10 +29,64 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import StepHistoryScreen from '../screens/home/StepHistoryScreen';
 import ExportReportScreen from '../screens/settings/ExportReportScreen';
 import PremiumUpgradeScreen from '../screens/settings/PremiumUpgradeScreen';
+import { THEME } from '../styles/theme';
 
 const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+
+const CaregiverTabNavigator = () => {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === 'DashboardMain') {
+            iconName = focused ? 'home' : 'home-outline';
+          } else if (route.name === 'MedicineTracker') {
+            iconName = focused ? 'medkit' : 'medkit-outline';
+          } else if (route.name === 'TaskBoard') {
+            iconName = focused ? 'checkbox' : 'checkbox-outline';
+          } else if (route.name === 'Settings') {
+            iconName = focused ? 'settings' : 'settings-outline';
+          }
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: THEME.colors.primary,
+        tabBarInactiveTintColor: THEME.colors.textMuted,
+        tabBarStyle: {
+          backgroundColor: THEME.colors.cardBg,
+          borderTopWidth: 1,
+          borderTopColor: THEME.colors.border,
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 10,
+          elevation: 10,
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+        },
+        tabBarLabelStyle: {
+          fontFamily: 'Inter_700Bold',
+          fontSize: 12,
+          fontWeight: '700',
+        },
+      })}
+    >
+      <Tab.Screen name="DashboardMain" component={DashboardScreen} options={{ tabBarLabel: 'Dashboard' }} />
+      <Tab.Screen name="MedicineTracker" component={MedicineDashboardScreen} options={{ tabBarLabel: 'Medicines' }} />
+      <Tab.Screen name="TaskBoard" component={TaskBoardScreen} options={{ tabBarLabel: 'Tasks' }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Settings' }} />
+    </Tab.Navigator>
+  );
+};
 
 const AppNavigator = () => {
+  const [fontsLoaded] = useFonts({
+    Inter_500Medium,
+    Inter_700Bold,
+  });
   const user = useStore(state => state.user);
   const _hasHydrated = useStore(state => state._hasHydrated);
   const currentCircle = useStore(state => state.currentCircle);
@@ -52,7 +109,7 @@ const AppNavigator = () => {
     };
   }, [currentCircle?.id, subscribeToCircle, unsubscribeFromCircle]);
 
-  if (!_hasHydrated) {
+  if (!_hasHydrated || !fontsLoaded) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#1A73E8" />
@@ -81,13 +138,9 @@ const AppNavigator = () => {
         </>
       ) : (
         <>
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
-          <Stack.Screen name="MedicineTracker" component={MedicineDashboardScreen} />
+          <Stack.Screen name="Dashboard" component={CaregiverTabNavigator} />
           <Stack.Screen name="MedicineAnalytics" component={CaregiverMedicinesScreen} />
-
-          <Stack.Screen name="TaskBoard" component={TaskBoardScreen} />
           <Stack.Screen name="CreateTask" component={CreateTaskScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="PremiumUpgrade" component={PremiumUpgradeScreen} />
           <Stack.Screen name="ExportReport" component={ExportReportScreen} />
           <Stack.Screen name="Documents" component={DocumentsScreen} />

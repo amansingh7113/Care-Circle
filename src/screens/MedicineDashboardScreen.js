@@ -352,7 +352,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.header}>MEDICINE TRACKER</Text>
+        <Text style={styles.header}>Medicine Tracker</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <TouchableOpacity onPress={() => navigation.navigate('MedicineAnalytics')} style={{ marginRight: 16 }}>
             <Ionicons name="pie-chart" size={32} color={THEME.colors.primary} />
@@ -379,7 +379,7 @@ const MedicineDashboardScreen = ({ route, navigation }) => {
           ListFooterComponent={() => (
             <View style={styles.bottomGraphicContainer}>
               <View style={styles.bottlePlaceholder}>
-                <Text style={{fontSize: 60}}>💊</Text>
+                <Ionicons name="medkit" size={56} color={THEME.colors.primary} />
               </View>
             </View>
           )}
@@ -630,13 +630,13 @@ const styles = StyleSheet.create({
   takenBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: `${THEME.colors.primary}20`,
+    backgroundColor: THEME.colors.primaryLight,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: THEME.borderRadius.badge,
   },
   takenBadgeText: {
-    color: THEME.colors.white,
+    color: THEME.colors.primary,
     fontWeight: '700',
     marginLeft: 8,
   },
@@ -647,8 +647,8 @@ const styles = StyleSheet.create({
     height: 150
   },
   bottlePlaceholder: {
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: `${THEME.colors.alert}20`,
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: THEME.colors.primaryLight,
     justifyContent: 'center', alignItems: 'center'
   },
   // Modal Styles
@@ -761,7 +761,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   freqBadge: {
-    backgroundColor: `${THEME.colors.primary}20`,
+    backgroundColor: THEME.colors.primaryLight,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,

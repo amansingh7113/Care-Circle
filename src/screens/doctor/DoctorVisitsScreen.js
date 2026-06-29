@@ -21,8 +21,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import AdBanner from '../../components/AdBanner';
 import { useStore } from '../../store/useStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { THEME } from '../../styles/theme';
 
-const PRIMARY_BLUE = '#1A73E8';
+const PRIMARY_BLUE = THEME.colors.primary;
 const TOUCH_TARGET_SIZE = 48;
 
 const DoctorVisitsScreen = ({ navigation }) => {
@@ -433,7 +434,7 @@ const DoctorVisitsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: THEME.colors.canvas,
   },
   center: {
     flex: 1,
@@ -446,14 +447,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: THEME.colors.cardBg,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: THEME.colors.border,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1E293B',
+    ...THEME.typography.header,
+    fontSize: 22,
+    color: THEME.colors.textHeader,
   },
   backBtn: {
     minHeight: TOUCH_TARGET_SIZE,
@@ -475,8 +476,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   summaryBtn: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
+    backgroundColor: THEME.colors.primaryLight,
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     minHeight: TOUCH_TARGET_SIZE,
@@ -484,16 +485,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   summaryBtnText: {
-    color: '#4F46E5',
-    fontWeight: '600',
+    color: THEME.colors.primary,
+    fontWeight: '700',
   },
   listContent: {
     padding: 20,
     paddingBottom: 100,
   },
   emptyText: {
+    ...THEME.typography.body,
     textAlign: 'center',
-    color: '#64748B',
+    color: THEME.colors.textMuted,
     marginTop: 40,
   },
   // Timeline Styles
@@ -516,19 +518,17 @@ const styles = StyleSheet.create({
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#CBD5E1',
+    backgroundColor: THEME.colors.border,
     marginTop: 4,
   },
   card: {
     flex: 1,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    backgroundColor: THEME.colors.cardBg,
+    borderRadius: THEME.borderRadius.card,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadows.soft,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -536,30 +536,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   doctorName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
+    ...THEME.typography.cardTitle,
+    color: THEME.colors.textHeader,
     flex: 1,
   },
   visitDate: {
-    fontSize: 14,
-    color: '#64748B',
+    ...THEME.typography.subtext,
+    color: THEME.colors.textMuted,
     marginLeft: 8,
   },
   reasonText: {
-    fontSize: 14,
-    color: '#334155',
+    ...THEME.typography.body,
+    color: THEME.colors.textBody,
     marginBottom: 8,
   },
   notesContainer: {
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
+    backgroundColor: THEME.colors.canvas,
+    padding: 14,
+    borderRadius: THEME.borderRadius.input,
     marginBottom: 12,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
   },
   notesText: {
-    fontSize: 14,
-    color: '#475569',
+    ...THEME.typography.body,
+    color: THEME.colors.textBody,
     fontStyle: 'italic',
   },
   attachmentsContainer: {
@@ -567,24 +568,26 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   attachmentChip: {
-    backgroundColor: '#E0E7FF',
-    paddingHorizontal: 12,
+    backgroundColor: THEME.colors.primaryLight,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 16,
+    borderRadius: 20,
     marginRight: 8,
     marginBottom: 8,
     minHeight: TOUCH_TARGET_SIZE,
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: `${THEME.colors.primary}30`,
   },
   attachmentText: {
     color: PRIMARY_BLUE,
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 13,
+    fontWeight: '700',
   },
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: THEME.colors.cardBg,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -592,11 +595,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: THEME.colors.border,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...THEME.typography.header,
+    fontSize: 20,
+    color: THEME.colors.textHeader,
   },
   closeBtn: {
     minHeight: TOUCH_TARGET_SIZE,
@@ -605,49 +609,54 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   closeBtnText: {
-    color: '#64748B',
+    color: THEME.colors.textMuted,
     fontSize: 16,
+    fontWeight: '600',
   },
   formContainer: {
     padding: 20,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.borderRadius.input,
     paddingHorizontal: 16,
     fontSize: 16,
     marginBottom: 16,
     minHeight: TOUCH_TARGET_SIZE,
-    color: '#1E293B',
+    color: THEME.colors.textHeader,
+    backgroundColor: THEME.colors.canvas,
   },
   textArea: {
     minHeight: 100,
     paddingTop: 12,
   },
   attachBtn: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 8,
+    backgroundColor: THEME.colors.surface,
+    borderRadius: THEME.borderRadius.button,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
     minHeight: TOUCH_TARGET_SIZE,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
   },
   attachBtnText: {
-    color: '#475569',
-    fontWeight: '500',
+    color: THEME.colors.textBody,
+    fontWeight: '600',
   },
   submitBtn: {
     backgroundColor: PRIMARY_BLUE,
-    borderRadius: 8,
+    borderRadius: THEME.borderRadius.button,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: TOUCH_TARGET_SIZE,
+    ...THEME.shadows.medium,
   },
   submitBtnText: {
-    color: '#FFF',
+    color: THEME.colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });
 

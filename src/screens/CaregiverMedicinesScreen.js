@@ -81,7 +81,7 @@ const CaregiverMedicinesScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.header}>ADHERENCE ANALYTICS</Text>
+        <Text style={styles.header}>Adherence Analytics</Text>
         <TouchableOpacity onPress={() => navigation.navigate('MedicineTracker')}>
           <Ionicons name="list-outline" size={28} color={THEME.colors.primary} />
         </TouchableOpacity>

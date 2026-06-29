@@ -4,7 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pill } from 'lucide-react-native';
+import { Pill, Bell, Settings, ShieldAlert, Droplet, Camera, Heart, Footprints, Moon, CheckCircle2, Stethoscope, DollarSign, FileText, ClipboardList } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { getCircleDetails } from '../services/circleApi';
 import { getSleepLogs } from '../services/sleepApi';
@@ -24,23 +24,25 @@ import { generatePdfTemplate } from '../utils/pdfTemplate';
 import LogBloodPressureModal from './home/LogBloodPressureModal';
 import AdBanner from '../components/AdBanner';
 import api from '../services/api';
+import Card from '../components/Card';
 
 const vitalsConfig = [
-  { id: '1', label: 'Blood Pressure', value: '--/--', icon: '❤️', color: THEME.colors.alert },
-  { id: '2', label: 'Medication', value: '--', icon: 'Pill', color: THEME.colors.primary, subLabel: 'No meds', upcoming: false },
-  { id: '3', label: 'Daily Steps', value: '0', icon: '👣', color: '#3BA0E3' },
-  { id: '4', label: 'Sleep', value: '--h --m', icon: '🌙', color: '#FCD34D' },
+  { id: '1', label: 'Blood Pressure', value: '--/--', icon: 'Heart', color: THEME.colors.alert, bg: THEME.colors.alertLight },
+  { id: '2', label: 'Medication', value: '--', icon: 'Pill', color: THEME.colors.primary, bg: THEME.colors.primaryLight, subLabel: 'No meds', upcoming: false },
+  { id: '3', label: 'Daily Steps', value: '0', icon: 'Footprints', color: '#3BA0E3', bg: THEME.colors.infoLight },
+  { id: '4', label: 'Sleep', value: '--h --m', icon: 'Moon', color: '#FCD34D', bg: THEME.colors.warningLight },
 ];
 
 const DashboardScreen = ({ route, navigation }) => {
-  const { circleId, circleName = 'My Circle' } = route.params || {};
+  const { bloodPressureLogs, sleepLogs, stepLogs, setBloodPressureLogs, setSleepLogs, setStepLogs, user, subscribeToCircle, unsubscribeFromCircle, lastHeartbeat, currentCircle } = useStore();
+  const circleId = route.params?.circleId || currentCircle?.id;
+  const circleName = route.params?.circleName || currentCircle?.name || 'My Circle';
   const insets = useSafeAreaInsets();
   const [members, setMembers] = useState([]);
   const [medicines, setMedicines] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [bpModalVisible, setBpModalVisible] = useState(false);
-  const { bloodPressureLogs, sleepLogs, stepLogs, setBloodPressureLogs, setSleepLogs, setStepLogs, user, subscribeToCircle, unsubscribeFromCircle, lastHeartbeat } = useStore();
   const [refreshing, setRefreshing] = useState(false);
   const [loggingMedId, setLoggingMedId] = useState(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -49,77 +51,40 @@ const DashboardScreen = ({ route, navigation }) => {
   const [isScanningMeal, setIsScanningMeal] = useState(false);
   const [isSyncingWearable, setIsSyncingWearable] = useState(false);
   const [loggingWater, setLoggingWater] = useState(false);
-  
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const holdProgress = useRef(new Animated.Value(0)).current;
 
   const triggerSOS = async () => {
-    try {
-      const circleData = await getCircleDetails(circleId);
-      
-      let locationString = "Location tracking unavailable";
-      if (circleData?.last_known_location?.latitude && circleData?.last_known_location?.longitude) {
-        locationString = `https://www.google.com/maps/search/?api=1&query=${circleData.last_known_location.latitude},${circleData.last_known_location.longitude}`;
-      }
-      
-      const rawText = `🚨 *CARECIRCLE EMERGENCY ALERT* 🚨\n\nImmediate attention required for our family Care Circle.\n- Triggered Remotely By: ${user?.full_name || 'CareCircle User'}\n- *Dad's Current Location:* ${locationString}\n\nPlease check on him immediately!`;
-      
-      const encodedText = encodeURIComponent(rawText);
-      const whatsAppUrl = `https://wa.me/?text=${encodedText}`;
-      
-      try {
-        await Linking.openURL(whatsAppUrl);
-      } catch (err) {
-        Alert.alert("Emergency Alert", rawText);
-      }
-    } catch (error) {
-      console.error('Error triggering SOS', error);
-      Alert.alert("Emergency Alert", "Failed to send emergency alert.");
-    }
+    Alert.alert(
+      "🚨 Emergency SOS",
+      `Are you sure you want to trigger an emergency alert for ${circleName}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Trigger SOS", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const circleData = await getCircleDetails(circleId);
+              let locationString = "Location tracking unavailable";
+              if (circleData?.last_known_location?.latitude && circleData?.last_known_location?.longitude) {
+                locationString = `https://www.google.com/maps/search/?api=1&query=${circleData.last_known_location.latitude},${circleData.last_known_location.longitude}`;
+              }
+              const rawText = `🚨 *CARECIRCLE EMERGENCY ALERT* 🚨\n\nImmediate attention required for our family Care Circle.\n- Triggered Remotely By: ${user?.full_name || 'CareCircle User'}\n- *Current Location:* ${locationString}\n\nPlease check immediately!`;
+              const encodedText = encodeURIComponent(rawText);
+              const whatsAppUrl = `https://wa.me/?text=${encodedText}`;
+              try {
+                await Linking.openURL(whatsAppUrl);
+              } catch (err) {
+                Alert.alert("Emergency Alert", rawText);
+              }
+            } catch (error) {
+              console.error('Error triggering SOS', error);
+              Alert.alert("Emergency Alert", "Failed to send emergency alert.");
+            }
+          }
+        }
+      ]
+    );
   };
-
-  const handleSosPressIn = () => {
-    Animated.timing(holdProgress, {
-      toValue: 1,
-      duration: 3000,
-      useNativeDriver: false,
-    }).start(({ finished }) => {
-      if (finished) {
-        triggerSOS();
-        Animated.timing(holdProgress, {
-           toValue: 0,
-           duration: 200,
-           useNativeDriver: false,
-        }).start();
-      }
-    });
-  };
-
-  const handleSosPressOut = () => {
-    holdProgress.stopAnimation();
-    Animated.timing(holdProgress, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  };
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 0.3,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        })
-      ])
-    ).start();
-  }, [pulseAnim]);
 
   const latestBp = bloodPressureLogs && bloodPressureLogs.length > 0 ? `${bloodPressureLogs[0].systolic}/${bloodPressureLogs[0].diastolic}` : '--/--';
   
@@ -200,10 +165,6 @@ const DashboardScreen = ({ route, navigation }) => {
     }
   }, [circleId, setBloodPressureLogs, setSleepLogs, setStepLogs]);
 
-  const getInitials = (name) => {
-    return name ? name.substring(0, 2).toUpperCase() : 'U';
-  };
-
   const handleScanMeal = async () => {
     try {
       const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
@@ -257,7 +218,7 @@ const DashboardScreen = ({ route, navigation }) => {
         new Promise((_, reject) => setTimeout(() => reject(new Error('Sync timed out connecting to wearable/sensors. Please try again.')), 4000))
       ]);
       Alert.alert('Sync Complete', `Synced ${steps} steps from Google Fit/Health Connect.`);
-      fetchCircleData().catch(e => console.log('fetchCircleData error:', e)); // Do not block UI!
+      fetchCircleData().catch(e => console.log('fetchCircleData error:', e));
     } catch (err) {
       Alert.alert('Sync Error', err.message || 'Failed to sync wearable data.');
     } finally {
@@ -279,7 +240,6 @@ const DashboardScreen = ({ route, navigation }) => {
     if (!nextMed) return;
     
     const previousStatus = nextMed.status;
-    // Optimistic Update
     setMedicines(current => current.map(m => m.id === nextMed.id ? { ...m, status: 'taken' } : m));
     setLoggingMedId(nextMed.id);
     
@@ -288,7 +248,6 @@ const DashboardScreen = ({ route, navigation }) => {
       await logAdministration(nextMed.id, 'taken', scheduledTime);
       setLoggingMedId(null);
     } catch (error) {
-      // Revert on failure
       setMedicines(current => current.map(m => m.id === nextMed.id ? { ...m, status: previousStatus } : m));
       setLoggingMedId(null);
       Alert.alert('Error', 'Failed to log medication. Please try again.');
@@ -371,73 +330,15 @@ const DashboardScreen = ({ route, navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.colors.primary]} />
         }
       >
-        
-        {/* Module: Emergency SOS Banner */}
-        <View style={styles.sosSection}>
-          <Pressable 
-            onPressIn={handleSosPressIn}
-            onPressOut={handleSosPressOut}
-            style={styles.sosContainer}
-          >
-            <Animated.View style={[styles.sosProgressBar, {
-              width: holdProgress.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%']
-              })
-            }]} />
-            <View style={styles.sosContent}>
-              <Text style={styles.sosTitle}>🚨 EMERGENCY SOS</Text>
-              <Text style={styles.sosSubtitle}>Hold for 3 seconds to alert Care Circle</Text>
-            </View>
-          </Pressable>
-        </View>
-
-        {/* Module: Daily Progress Hero Card */}
-        <View style={styles.progressSection}>
-          <View style={styles.progressCard}>
-            <CircularProgressRing progress={taskProgress} size={110} strokeWidth={14} color={THEME.colors.primary} />
-            <View style={styles.progressInfo}>
-              <Text style={styles.progressValue}>{taskProgress}%</Text>
-              <Text style={styles.progressLabel}>TASKS COMPLETED</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Hydration & Diet Widget */}
-        <View style={styles.hydrationContainer}>
-          <View style={{flex: 1}}>
-            <Text style={styles.sectionTitle}>Daily Water Goal</Text>
-            <Text style={styles.hydrationText}>{hydrationMl} ml / 2000 ml</Text>
-            <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: `${Math.min((hydrationMl / 2000) * 100, 100)}%` }]} />
-            </View>
-            <TouchableOpacity style={styles.logWaterBtn} onPress={handleLogWater}>
-              <Text style={styles.logWaterBtnText}>+ 250ml 💧</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{flex: 1, marginLeft: 16}}>
-            <Text style={styles.sectionTitle}>Diet Intake</Text>
-            <Text style={styles.hydrationText}>{nutritionCalories} kcal logged</Text>
-            <View style={[styles.progressBarBg, { backgroundColor: '#fcd34d' }]}>
-              <View style={[styles.progressBarFill, { width: `${Math.min((nutritionCalories / 2500) * 100, 100)}%`, backgroundColor: '#fbbf24' }]} />
-            </View>
-            <TouchableOpacity style={[styles.logWaterBtn, {backgroundColor: '#f59e0b'}]} onPress={handleScanMeal} disabled={isScanningMeal}>
-              <Text style={styles.logWaterBtnText}>{isScanningMeal ? "Scanning..." : "📷 Scan Meal"}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Module: Single-Tap Interactive Medication Card */}
-        <Text style={styles.sectionTitle}>Upcoming Medication</Text>
+        {/* Module: Single-Tap Interactive Medication Card (Prominent Hero Element) */}
         {nextMed && (
           <View style={styles.nextMedSection}>
+            <Text style={styles.sectionTitle}>Upcoming Medication</Text>
             <LinearGradient colors={THEME.gradients.primary} start={{x: 0, y: 0}} end={{x: 1, y: 1}} style={styles.nextMedCard}>
               <View style={styles.nextMedInfo}>
                 <View style={styles.nextMedHeader}>
                   <Text style={styles.nextMedTime}>{getMedTime(nextMed)}</Text>
-                  <Animated.View style={{ opacity: pulseAnim, marginLeft: 8 }}>
-                    <Pill size={20} color={THEME.colors.white} />
-                  </Animated.View>
+                  <Pill size={20} color={THEME.colors.white} style={{ marginLeft: 8 }} />
                 </View>
                 <Text style={styles.nextMedName}>{nextMed.name}</Text>
                 <Text style={styles.nextMedDosage}>{nextMed.dosage}</Text>
@@ -447,6 +348,8 @@ const DashboardScreen = ({ route, navigation }) => {
                 onPress={handleLogNextMed}
                 disabled={loggingMedId === nextMed.slot_id}
                 activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Take ${nextMed.name} now`}
               >
                 {loggingMedId === nextMed.slot_id ? (
                   <ActivityIndicator color={THEME.colors.primary} />
@@ -458,12 +361,18 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Module B: Wellness Vitals Quick-Grid */}
+        {/* Bento Grid: Wellness Vitals */}
         <View style={styles.vitalsSection}>
-          <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12}}>
-            <Text style={[styles.sectionTitle, {marginBottom: 0}]}>Vitals</Text>
-            <TouchableOpacity onPress={handleSyncWearable} disabled={isSyncingWearable} style={{backgroundColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16}}>
-              <Text style={{fontSize: 12, fontWeight: 'bold', color: THEME.colors.primary}}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Vitals Overview</Text>
+            <TouchableOpacity 
+              onPress={handleSyncWearable} 
+              disabled={isSyncingWearable} 
+              style={styles.syncBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Sync Wearable"
+            >
+              <Text style={styles.syncBtnText}>
                 {isSyncingWearable ? "Syncing..." : "⌚ Sync Wearable"}
               </Text>
             </TouchableOpacity>
@@ -477,7 +386,6 @@ const DashboardScreen = ({ route, navigation }) => {
               
               let displayValue = vital.value;
               let currentSubLabel = vital.subLabel;
-              let currentUpcoming = vital.upcoming;
 
               if (isBP && bloodPressureLogs?.length > 0) displayValue = latestBp;
               if (isSleep && sleepLogs?.length > 0) displayValue = latestSleep;
@@ -487,13 +395,9 @@ const DashboardScreen = ({ route, navigation }) => {
                 displayValue = `${todaySteps}`;
               }
               if (isMedication) {
-                const pendingMeds = (medicines || []).filter(m => m.status !== 'taken');
-                const nextMed = pendingMeds.length > 0 ? pendingMeds[0] : null;
-                currentUpcoming = !!nextMed;
-                displayValue = nextMed ? getMedTime(nextMed) : 'All Taken';
-                currentSubLabel = nextMed 
-                  ? `${nextMed.name}${nextMed.dosage ? ` • ${nextMed.dosage}` : ''}`
-                  : 'No pending meds';
+                if (nextMed) return null;
+                displayValue = 'All Taken';
+                currentSubLabel = 'No pending meds';
               }
 
               return (
@@ -503,21 +407,25 @@ const DashboardScreen = ({ route, navigation }) => {
                   onPress={() => {
                     if (isBP) setBpModalVisible(true);
                     if (isMedication) navigation.navigate('MedicineTracker');
-                    if (isSleep) {
-                      navigation.navigate('SleepDetails');
-                    }
+                    if (isSleep) navigation.navigate('SleepDetails');
                     if (isSteps) navigation.navigate('StepHistory');
                   }}
-                  activeOpacity={(isBP || isSleep || isMedication || isSteps) ? 0.7 : 1}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${vital.label}, ${displayValue}`}
                 >
                   <View style={styles.vitalHeaderRow}>
-                    {isMedication ? (
-                      <Animated.View style={{ opacity: currentUpcoming ? pulseAnim : 1, marginRight: 8 }}>
-                         <Pill size={20} color={vital.color} />
-                      </Animated.View>
-                    ) : (
-                      <Text style={styles.vitalIcon}>{vital.icon}</Text>
-                    )}
+                    <View style={[styles.vitalIconBadge, { backgroundColor: vital.bg }]}>
+                      {isMedication ? (
+                        <Pill size={20} color={vital.color} />
+                      ) : isBP ? (
+                        <Heart size={20} color={vital.color} />
+                      ) : isSleep ? (
+                        <Moon size={20} color={vital.color} />
+                      ) : (
+                        <Footprints size={20} color={vital.color} />
+                      )}
+                    </View>
                     <Text style={styles.vitalValue}>{displayValue}</Text>
                   </View>
                   {isMedication && currentSubLabel ? (
@@ -536,15 +444,132 @@ const DashboardScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Module A: Live Care Circle Activity Feed Timeline */}
+        {/* Bento Grid: Care Management & Quick Access */}
+        <View style={styles.shortcutsContainer}>
+          <Text style={styles.sectionTitle}>Care Management</Text>
+          <View style={styles.shortcutsRow}>
+            <TouchableOpacity 
+              style={styles.shortcutCard}
+              onPress={() => navigation.navigate('DoctorVisits')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Navigate to Doctor Visits"
+            >
+              <View style={[styles.shortcutIconBadge, { backgroundColor: THEME.colors.successLight }]}>
+                <Stethoscope size={22} color={THEME.colors.success} />
+              </View>
+              <Text style={styles.shortcutCardText}>Doctor Visits</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.shortcutCard}
+              onPress={() => navigation.navigate('Expenses')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Navigate to Expenses"
+            >
+              <View style={[styles.shortcutIconBadge, { backgroundColor: THEME.colors.alertLight }]}>
+                <DollarSign size={22} color={THEME.colors.alert} />
+              </View>
+              <Text style={styles.shortcutCardText}>Expenses</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.shortcutsRow, { marginTop: 16 }]}>
+            <TouchableOpacity 
+              style={styles.shortcutCard}
+              onPress={() => navigation.navigate('Documents')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Navigate to Documents Hub"
+            >
+              <View style={[styles.shortcutIconBadge, { backgroundColor: THEME.colors.warningLight }]}>
+                <FileText size={22} color={THEME.colors.warning} />
+              </View>
+              <Text style={styles.shortcutCardText}>Documents Hub</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.shortcutCard, { backgroundColor: THEME.colors.primaryLight }]}
+              onPress={handleShareMedicalReport}
+              disabled={isGeneratingPdf}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Share Medical Report"
+            >
+              <View style={[styles.shortcutIconBadge, { backgroundColor: THEME.colors.white }]}>
+                {isGeneratingPdf ? (
+                  <ActivityIndicator color={THEME.colors.primary} />
+                ) : (
+                  <FileText size={22} color={THEME.colors.primary} />
+                )}
+              </View>
+              <Text style={[styles.shortcutCardText, { color: THEME.colors.primary }]}>Share Report</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Bento Grid: Daily Progress & Nutrition */}
+        <View style={styles.wellnessSection}>
+          <Text style={styles.sectionTitle}>Daily Progress</Text>
+
+          {/* Daily Tasks Progress Banner */}
+          <View style={styles.taskProgressCard}>
+            <CircularProgressRing progress={taskProgress} size={64} strokeWidth={8} color={THEME.colors.primary} />
+            <View style={styles.taskProgressInfo}>
+              <Text style={styles.taskProgressTitle}>Daily Task Fulfillment</Text>
+              <Text style={styles.taskProgressSubtitle}>{completedTasks} of {totalTasks} tasks completed today</Text>
+            </View>
+            <Text style={styles.taskProgressPercent}>{taskProgress}%</Text>
+          </View>
+
+          {/* Hydration & Diet Widget */}
+          <View style={styles.hydrationContainer}>
+            <View style={{flex: 1}}>
+              <Text style={styles.sectionTitle}>Daily Water Goal</Text>
+              <Text style={styles.hydrationText}>{hydrationMl} ml / 2000 ml</Text>
+              <View style={styles.progressBarBg}>
+                <View style={[styles.progressBarFill, { width: `${Math.min((hydrationMl / 2000) * 100, 100)}%` }]} />
+              </View>
+              <TouchableOpacity 
+                style={styles.logWaterBtn} 
+                onPress={handleLogWater}
+                accessibilityRole="button"
+                accessibilityLabel="Log 250ml of water"
+              >
+                <Droplet size={18} color={THEME.colors.white} style={{ marginRight: 6 }} />
+                <Text style={styles.logWaterBtnText}>+ 250ml</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{flex: 1, marginLeft: 16}}>
+              <Text style={styles.sectionTitle}>Diet Intake</Text>
+              <Text style={styles.hydrationText}>{nutritionCalories} kcal logged</Text>
+              <View style={[styles.progressBarBg, { backgroundColor: THEME.colors.warningLight }]}>
+                <View style={[styles.progressBarFill, { width: `${Math.min((nutritionCalories / 2500) * 100, 100)}%`, backgroundColor: THEME.colors.warning }]} />
+              </View>
+              <TouchableOpacity 
+                style={[styles.logWaterBtn, {backgroundColor: THEME.colors.warning}]} 
+                onPress={handleScanMeal} 
+                disabled={isScanningMeal}
+                accessibilityRole="button"
+                accessibilityLabel="Scan Meal"
+              >
+                <Camera size={18} color={THEME.colors.white} style={{ marginRight: 6 }} />
+                <Text style={styles.logWaterBtnText}>{isScanningMeal ? "Scanning..." : "Scan Meal"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Live Care Circle Activity Feed Timeline */}
         <View style={styles.activitySection}>
           <Text style={styles.sectionTitle}>Task Feed</Text>
           <View style={styles.timelineContainer}>
             {pendingTasks.slice(0, 5).map((task, index) => (
               <View key={task.id} style={styles.timelineItem}>
                 <View style={styles.timelineLeft}>
-                  <View style={[styles.timelineIconBadge, { backgroundColor: `${THEME.colors.success}20` }]}>
-                       <Text style={{fontSize: 12}}>📋</Text>
+                  <View style={[styles.timelineIconBadge, { backgroundColor: THEME.colors.successLight }]}>
+                       <CheckCircle2 size={18} color={THEME.colors.success} />
                   </View>
                   {index !== Math.min(pendingTasks.length, 5) - 1 && <View style={styles.timelineLine} />}
                 </View>
@@ -556,90 +581,48 @@ const DashboardScreen = ({ route, navigation }) => {
                 </View>
               </View>
             ))}
-            {pendingTasks.length === 0 && <Text style={{color: THEME.colors.textMuted, marginTop: 10, textAlign: 'center'}}>No pending tasks!</Text>}
-          </View>
-        </View>
-
-        {/* Quick Actions (Keeping for functionality but updating style) */}
-        <View style={styles.shortcutsContainer}>
-          <View style={styles.shortcutsRow}>
-            <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: THEME.colors.primary }]}
-              onPress={() => navigation.navigate('MedicineTracker')}
-            >
-              <Text style={styles.buttonText}>Medicine Tracker</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: THEME.colors.deepNavy }]}
-              onPress={() => navigation.navigate('TaskBoard')}
-            >
-              <Text style={styles.buttonText}>Task Board</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={[styles.shortcutsRow, { marginTop: 12 }]}>
-            <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: '#43A047' }]}
-              onPress={() => navigation.navigate('DoctorVisits')}
-            >
-              <Text style={styles.buttonText}>Doctor Visits</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: '#E53935' }]}
-              onPress={() => navigation.navigate('Expenses')}
-            >
-              <Text style={styles.buttonText}>Expenses</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={[styles.shortcutsRow, { marginTop: 12 }]}>
-            <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: '#FFB300' }]}
-              onPress={() => navigation.navigate('Documents')}
-            >
-              <Text style={styles.buttonText}>Documents Hub</Text>
-            </TouchableOpacity>
-            <View style={[styles.shortcutButton, { backgroundColor: 'transparent', elevation: 0 }]} />
-          </View>
-          <View style={[styles.shortcutsRow, { marginTop: 12 }]}>
-            <TouchableOpacity 
-              style={[styles.shortcutButton, { backgroundColor: THEME.colors.primary, width: '100%', flexDirection: 'row', justifyContent: 'center' }]}
-              onPress={handleShareMedicalReport}
-              disabled={isGeneratingPdf}
-            >
-              {isGeneratingPdf ? (
-                <ActivityIndicator color={THEME.colors.white} />
-              ) : (
-                <>
-                  <Text style={{ fontSize: 16, marginRight: 8 }}>📄</Text>
-                  <Text style={styles.buttonText}>Share Medical Report (PDF)</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {pendingTasks.length === 0 && <Text style={{color: THEME.colors.textMuted, marginTop: 10, textAlign: 'center', fontFamily: 'Inter_500Medium'}}>No pending tasks!</Text>}
           </View>
         </View>
         
-        <View style={{height: 100}} />
+        <View style={{height: 40}} />
       </ScrollView>
 
-      {/* Blurred Header */}
+      {/* Blurred Header with Floating SOS Button */}
       <BlurView intensity={90} tint="light" style={[styles.blurHeader, { paddingTop: Platform.OS === 'android' ? Math.max(insets.top, 20) : 0 }]}>
         <SafeAreaView>
           <View style={styles.headerContainer}>
             <Text style={[styles.header, { flexShrink: 1, marginRight: 10 }]} numberOfLines={1} ellipsizeMode="tail">{circleName}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Notifications')}>
-                 <Text style={{fontSize: 24, color: THEME.colors.primary}}>🔔</Text>
+              <TouchableOpacity 
+                style={styles.sosHeaderBtn} 
+                onPress={triggerSOS}
+                accessibilityRole="button"
+                accessibilityLabel="Trigger Emergency SOS"
+              >
+                 <ShieldAlert size={18} color={THEME.colors.white} style={{ marginRight: 4 }} />
+                 <Text style={styles.sosHeaderBtnText}>SOS</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.settingsIcon} 
+                onPress={() => navigation.navigate('Notifications')}
+                accessibilityRole="button"
+                accessibilityLabel="Notifications"
+              >
+                 <Bell size={24} color={THEME.colors.primary} />
                  <View style={styles.notificationBadge}>
                    <Text style={styles.notificationBadgeText}>3</Text>
                  </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.settingsIcon} onPress={() => navigation.navigate('Settings')}>
-                 {/* Gear icon placeholder */}
-                 <Text style={{fontSize: 24, color: THEME.colors.primary}}>⚙️</Text>
               </TouchableOpacity>
             </View>
           </View>
         </SafeAreaView>
       </BlurView>
+
+      <LogBloodPressureModal 
+        visible={bpModalVisible} 
+        onClose={() => setBpModalVisible(false)} 
+      />
     </View>
   );
 };
@@ -647,69 +630,78 @@ const DashboardScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: THEME.colors.canvas },
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 20, paddingTop: 120, paddingBottom: 40 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 110, paddingBottom: 40 },
   blurHeader: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, paddingHorizontal: 20 },
   headerContainer: { marginTop: 20, marginBottom: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   header: { ...THEME.typography.header, color: THEME.colors.primary },
-  settingsIcon: { padding: 12, position: 'relative', marginLeft: 8, minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  notificationBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: THEME.colors.alert || '#E53935', borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: THEME.colors.canvas },
-  notificationBadgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
-  sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 16, marginTop: 8 },
-  
-  // Emergency SOS Banner Styles
-  sosSection: { marginBottom: 24 },
-  sosContainer: {
-    backgroundColor: '#FFEAEA',
-    borderRadius: THEME.borderRadius.card,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#FFCACA',
-    ...THEME.shadows.soft,
-    position: 'relative'
-  },
-  sosContent: {
-    padding: 20,
-    alignItems: 'center',
+  sosHeaderBtn: { 
+    backgroundColor: THEME.colors.danger, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 14, 
+    paddingVertical: 10, 
+    borderRadius: 20, 
+    minHeight: 48, 
     justifyContent: 'center',
-    zIndex: 2,
+    ...THEME.shadows.soft 
   },
-  sosTitle: {
-    ...THEME.typography.header,
-    color: THEME.colors.alert || '#E53935',
-    fontSize: 20,
-    marginBottom: 4
-  },
-  sosSubtitle: {
-    ...THEME.typography.label,
-    color: '#D32F2F',
-  },
-  sosProgressBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: '#FFCDD2',
-    zIndex: 1,
-  },
+  sosHeaderBtnText: { color: THEME.colors.white, fontFamily: 'Inter_700Bold', fontSize: 14, fontWeight: '700' },
+  settingsIcon: { padding: 12, position: 'relative', marginLeft: 8, minWidth: 48, minHeight: 48, alignItems: 'center', justifyContent: 'center' },
+  notificationBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: THEME.colors.alert, borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: THEME.colors.canvas },
+  notificationBadgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  sectionTitle: { ...THEME.typography.cardTitle, marginBottom: 14, marginTop: 6, fontSize: 18 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, marginTop: 6 },
 
-  // Progress Ring Styles
-  progressSection: { marginBottom: 24 },
-  progressCard: {
-    backgroundColor: THEME.colors.cardBg,
-    padding: 24, borderRadius: THEME.borderRadius.card,
-    flexDirection: 'row', alignItems: 'center',
-    ...THEME.shadows.medium,
-    borderWidth: 0
+  // Vitals Grid Styles
+  vitalsSection: { marginBottom: 24 },
+  vitalsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  vitalCard: {
+    width: '48%', backgroundColor: THEME.colors.cardBg,
+    padding: 18, borderRadius: THEME.borderRadius.card,
+    marginBottom: 16, ...THEME.shadows.medium,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    justifyContent: 'space-between',
+    minHeight: 115
   },
-  progressInfo: { marginLeft: 24, flex: 1 },
-  progressValue: { ...THEME.typography.header, fontSize: 32, marginBottom: 4 },
-  progressLabel: { ...THEME.typography.label, color: THEME.colors.textBody },
-  
+  vitalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  vitalIconBadge: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  vitalValue: { ...THEME.typography.cardTitle, fontSize: 20 },
+  vitalBarContainer: { height: 5, borderRadius: 2.5, width: '100%', marginBottom: 10 },
+  vitalBarFill: { height: '100%', borderRadius: 2.5 },
+  vitalLabel: { ...THEME.typography.label, fontSize: 10 },
+  vitalSubLabel: { ...THEME.typography.label, color: THEME.colors.textMuted, marginBottom: 8, fontSize: 11 },
+
+  // Shortcuts / Bento Grid Styles
+  shortcutsContainer: { marginBottom: 24 },
+  shortcutsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  shortcutCard: {
+    width: '48%',
+    backgroundColor: THEME.colors.cardBg,
+    borderRadius: THEME.borderRadius.card,
+    padding: 18,
+    ...THEME.shadows.medium,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    alignItems: 'center',
+    minHeight: 120,
+    justifyContent: 'center'
+  },
+  shortcutIconBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  shortcutCardText: { ...THEME.typography.cardTitle, fontSize: 14, textAlign: 'center' },
+
   // Next Medication Card Styles
   nextMedSection: { marginBottom: 24 },
   nextMedCard: {
     borderRadius: THEME.borderRadius.card,
-    padding: 24,
+    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -717,45 +709,47 @@ const styles = StyleSheet.create({
   },
   nextMedInfo: { flex: 1, marginRight: 16 },
   nextMedHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  nextMedTime: { color: THEME.colors.white, fontWeight: '700', fontSize: 16 },
-  nextMedName: { color: THEME.colors.white, fontSize: 22, fontWeight: '800', marginBottom: 2 },
-  nextMedDosage: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '500' },
+  nextMedTime: { color: THEME.colors.white, fontFamily: 'Inter_700Bold', fontWeight: '700', fontSize: 15 },
+  nextMedName: { color: THEME.colors.white, fontFamily: 'Inter_700Bold', fontSize: 20, fontWeight: '800', marginBottom: 2 },
+  nextMedDosage: { color: 'rgba(255,255,255,0.8)', fontFamily: 'Inter_500Medium', fontSize: 13, fontWeight: '500' },
   logButton: {
     backgroundColor: THEME.colors.white,
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 30,
+    paddingHorizontal: 18,
+    borderRadius: 25,
     ...THEME.shadows.soft,
   },
   logButtonDisabled: { opacity: 0.7 },
-  logButtonText: { color: THEME.colors.primary, fontWeight: '800', fontSize: 14 },
+  logButtonText: { color: THEME.colors.primary, fontFamily: 'Inter_700Bold', fontWeight: '800', fontSize: 13 },
 
-  // Hydration Styles
-  hydrationContainer: { backgroundColor: THEME.colors.cardBg, borderRadius: THEME.borderRadius.card, padding: 20, marginBottom: 20, ...THEME.shadows.medium, flexDirection: 'row', justifyContent: 'space-between' },
-  hydrationText: { fontWeight: '700', fontSize: 14, color: THEME.colors.textBody, marginBottom: 8 },
-  progressBarBg: { height: 8, backgroundColor: '#e0f2fe', borderRadius: 4, marginBottom: 16 },
-  progressBarFill: { height: '100%', borderRadius: 4, backgroundColor: THEME.colors.primary },
-  logWaterBtn: { backgroundColor: THEME.colors.primary, paddingVertical: 12, borderRadius: THEME.borderRadius.button, alignItems: 'center', minHeight: 48, justifyContent: 'center' },
-  logWaterBtnText: { color: THEME.colors.white, fontSize: 14, fontWeight: '800' },
+  // Wellness & Progress Section Styles
+  wellnessSection: { marginBottom: 24 },
+  syncBtn: { backgroundColor: '#f3f4f6', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, minHeight: 48, justifyContent: 'center' },
+  syncBtnText: { fontFamily: 'Inter_700Bold', fontSize: 12, fontWeight: 'bold', color: THEME.colors.primary },
   
-  // Vitals Grid Styles
-  vitalsSection: { marginBottom: 28 },
-  vitalsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  vitalCard: {
-    width: '48%', backgroundColor: THEME.colors.cardBg,
-    padding: 20, borderRadius: THEME.borderRadius.card,
-    marginBottom: 16, ...THEME.shadows.medium,
-    borderWidth: 0,
-    justifyContent: 'space-between',
-    minHeight: 120
+  taskProgressCard: {
+    backgroundColor: THEME.colors.cardBg,
+    padding: 18,
+    borderRadius: THEME.borderRadius.card,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    ...THEME.shadows.medium,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
   },
-  vitalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  vitalIcon: { fontSize: 20, marginRight: 8 },
-  vitalValue: { ...THEME.typography.cardTitle, fontSize: 20 },
-  vitalBarContainer: { height: 6, borderRadius: 3, width: '100%', marginBottom: 10 },
-  vitalBarFill: { height: '100%', borderRadius: 3 },
-  vitalLabel: { ...THEME.typography.label, fontSize: 10 },
-  vitalSubLabel: { ...THEME.typography.label, color: THEME.colors.textMuted, marginBottom: 10, fontSize: 12 },
+  taskProgressInfo: { marginLeft: 16, flex: 1 },
+  taskProgressTitle: { ...THEME.typography.cardTitle, fontSize: 15, marginBottom: 2 },
+  taskProgressSubtitle: { ...THEME.typography.label, color: THEME.colors.textBody, fontSize: 12 },
+  taskProgressPercent: { ...THEME.typography.header, fontSize: 22, color: THEME.colors.primary, marginLeft: 10 },
+
+  // Hydration & Diet Styles
+  hydrationContainer: { backgroundColor: THEME.colors.cardBg, borderRadius: THEME.borderRadius.card, padding: 18, marginBottom: 16, ...THEME.shadows.medium, borderWidth: 1, borderColor: THEME.colors.border, flexDirection: 'row', justifyContent: 'space-between' },
+  hydrationText: { fontFamily: 'Inter_700Bold', fontWeight: '700', fontSize: 13, color: THEME.colors.textBody, marginBottom: 8 },
+  progressBarBg: { height: 6, backgroundColor: '#e0f2fe', borderRadius: 3, marginBottom: 14 },
+  progressBarFill: { height: '100%', borderRadius: 3, backgroundColor: THEME.colors.primary },
+  logWaterBtn: { backgroundColor: THEME.colors.primary, paddingVertical: 12, borderRadius: THEME.borderRadius.button, flexDirection: 'row', alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+  logWaterBtnText: { color: THEME.colors.white, fontFamily: 'Inter_700Bold', fontSize: 14, fontWeight: '800' },
 
   // Activity Feed Styles
   activitySection: { marginBottom: 28 },
@@ -766,18 +760,8 @@ const styles = StyleSheet.create({
   timelineLine: { width: 2, flex: 1, backgroundColor: `${THEME.colors.border}80`, position: 'absolute', top: 36, bottom: -4, zIndex: 1 },
   timelineContent: { flex: 1, paddingLeft: 16, paddingBottom: 24, paddingTop: 8 },
   activityText: { ...THEME.typography.body, marginBottom: 6 },
-  activityUser: { fontWeight: '700', color: THEME.colors.textHeader },
-  activityTime: { ...THEME.typography.label, fontSize: 10, color: THEME.colors.textMuted },
-
-  // Shortcuts Styles
-  shortcutsContainer: { marginBottom: 20 },
-  shortcutsRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  shortcutButton: {
-    width: '48%', padding: 18, borderRadius: THEME.borderRadius.button,
-    alignItems: 'center', ...THEME.shadows.medium,
-    minHeight: 56, justifyContent: 'center'
-  },
-  buttonText: { color: THEME.colors.white, fontSize: 14, fontWeight: '700' }
+  activityUser: { fontFamily: 'Inter_700Bold', fontWeight: '700', color: THEME.colors.textHeader },
+  activityTime: { ...THEME.typography.label, fontSize: 10, color: THEME.colors.textMuted }
 });
 
 export default DashboardScreen;

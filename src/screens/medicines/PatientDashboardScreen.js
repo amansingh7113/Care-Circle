@@ -206,7 +206,8 @@ const PatientDashboardScreen = ({ navigation }) => {
               <Text style={styles.subGreeting}>How are you feeling today?</Text>
               {streak > 0 && (
                 <View style={styles.streakBadge}>
-                  <Text style={styles.streakText}>🔥 {streak} Day Streak</Text>
+                  <Ionicons name="flame" size={14} color="#d97706" style={{marginRight: 4}} />
+                  <Text style={styles.streakText}>{streak} Day Streak</Text>
                 </View>
               )}
             </View>
@@ -243,17 +244,19 @@ const PatientDashboardScreen = ({ navigation }) => {
                       <View style={[styles.progressBarFill, { width: `${Math.min((hydrationMl / 2000) * 100, 100)}%` }]} />
                     </View>
                     <TouchableOpacity style={styles.logWaterBtn} onPress={handleLogWater} disabled={loggingWater}>
-                      <Text style={styles.logWaterBtnText}>{loggingWater ? "..." : "+ 250ml 💧"}</Text>
+                      {!loggingWater && <Ionicons name="water" size={16} color={THEME.colors.white} style={{marginRight: 6}} />}
+                      <Text style={styles.logWaterBtnText}>{loggingWater ? "Logging..." : "+ 250ml"}</Text>
                     </TouchableOpacity>
                   </View>
                   <View style={{flex: 1, marginLeft: 16}}>
                     <Text style={styles.sectionTitle}>Diet</Text>
                     <Text style={styles.hydrationText}>{nutritionCalories} kcal</Text>
-                    <View style={[styles.progressBarBg, { backgroundColor: '#fcd34d' }]}>
-                      <View style={[styles.progressBarFill, { width: `${Math.min((nutritionCalories / 2500) * 100, 100)}%`, backgroundColor: '#fbbf24' }]} />
+                    <View style={[styles.progressBarBg, { backgroundColor: THEME.colors.warningLight }]}>
+                      <View style={[styles.progressBarFill, { width: `${Math.min((nutritionCalories / 2500) * 100, 100)}%`, backgroundColor: THEME.colors.warning }]} />
                     </View>
-                    <TouchableOpacity style={[styles.logWaterBtn, {backgroundColor: '#f59e0b'}]} onPress={handleScanMeal} disabled={isScanningMeal}>
-                      <Text style={styles.logWaterBtnText}>{isScanningMeal ? "..." : "📷 Scan Meal"}</Text>
+                    <TouchableOpacity style={[styles.logWaterBtn, {backgroundColor: THEME.colors.warning}]} onPress={handleScanMeal} disabled={isScanningMeal}>
+                      {!isScanningMeal && <Ionicons name="camera" size={16} color={THEME.colors.white} style={{marginRight: 6}} />}
+                      <Text style={styles.logWaterBtnText}>{isScanningMeal ? "Scanning..." : "Scan Meal"}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -281,7 +284,7 @@ const styles = StyleSheet.create({
   header: { padding: 20, paddingTop: 40, backgroundColor: THEME.colors.white, ...THEME.shadows.soft, marginBottom: 10 },
   headerGreeting: { ...THEME.typography.header, fontSize: 28, color: THEME.colors.primary, marginBottom: 4 },
   subGreeting: { fontSize: 16, color: THEME.colors.textBody, marginTop: 4 },
-  streakBadge: { backgroundColor: '#fef08a', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, marginLeft: 8 },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fef08a', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginLeft: 8 },
   streakText: { fontSize: 12, fontWeight: 'bold', color: '#d97706' },
   headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   settingsIcon: { padding: 4 },
@@ -299,8 +302,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   listContent: { padding: 16 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: THEME.colors.textHeader, marginBottom: 8 },
-  hydrationContainer: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, flexDirection: 'row', justifyContent: 'space-between' },
-  card: { backgroundColor: THEME.colors.white, padding: 20, marginVertical: 10, borderRadius: 16, ...THEME.shadows.medium },
+  hydrationContainer: { backgroundColor: THEME.colors.white, borderRadius: 16, padding: 18, marginBottom: 20, ...THEME.shadows.soft, flexDirection: 'row', justifyContent: 'space-between', borderWidth: 1, borderColor: THEME.colors.border },
+  hydrationText: { fontWeight: '700', fontSize: 14, color: THEME.colors.textBody, marginBottom: 8 },
+  progressBarBg: { height: 6, backgroundColor: '#e0f2fe', borderRadius: 3, marginBottom: 14 },
+  progressBarFill: { height: '100%', borderRadius: 3, backgroundColor: THEME.colors.primary },
+  logWaterBtn: { backgroundColor: THEME.colors.primary, paddingVertical: 12, borderRadius: THEME.borderRadius.button, flexDirection: 'row', alignItems: 'center', minHeight: 48, justifyContent: 'center' },
+  logWaterBtnText: { color: THEME.colors.white, fontSize: 14, fontWeight: '800' },
+  card: { backgroundColor: THEME.colors.white, padding: 20, marginVertical: 10, borderRadius: 16, ...THEME.shadows.medium, borderWidth: 1, borderColor: THEME.colors.border },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   title: { fontSize: 22, fontWeight: '800', color: THEME.colors.textHeader, marginBottom: 4 },
   dosage: { fontSize: 16, color: THEME.colors.textBody, fontWeight: '600' },

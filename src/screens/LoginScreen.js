@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, LayoutAnimation, UIManager, Modal } from 'react-native';
 import { sendOtp, exchangeSession } from '../services/authApi';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
@@ -8,17 +8,20 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useStore } from '../store/useStore';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '../services/supabase';
-import { Modal } from 'react-native';
 import { changeLanguage } from '../i18n';
 import { THEME } from '../styles/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Ensure the browser closes when returning to the app
 WebBrowser.maybeCompleteAuthSession();
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const LoginScreen = ({ navigation }) => {
   const appLanguage = useStore(state => state.appLanguage);
   const [langModalVisible, setLangModalVisible] = useState(false);
+  const [emailModalVisible, setEmailModalVisible] = useState(false);
 
   React.useEffect(() => {
     if (!appLanguage) {
@@ -31,8 +34,8 @@ const LoginScreen = ({ navigation }) => {
     changeLanguage(code);
     setLangModalVisible(false);
   };
-  const [authMode, setAuthMode] = useState('phone'); // 'phone', 'email-login', 'email-register'
-  
+
+  const [authMode, setAuthMode] = useState('email-login'); // 'email-login', 'email-register'
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -122,9 +125,11 @@ const LoginScreen = ({ navigation }) => {
       if (authMode === 'email-login') {
         await loginWithEmail(email, password);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setEmailModalVisible(false);
       } else {
         await registerWithEmail(email, password);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setEmailModalVisible(false);
       }
     } catch (error) {
       Alert.alert('Error', error.response?.data?.error || error.message || 'Authentication failed');
@@ -193,91 +198,39 @@ const LoginScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>Welcome to CareCircle</Text>
-        <Text style={styles.subtitle}>
-          {authMode === 'phone' && 'Enter your phone number to get started'}
-          {authMode === 'email-login' && 'Sign in with your email and password'}
-          {authMode === 'email-register' && 'Create an account with email'}
-        </Text>
-        
-        {authMode === 'phone' ? (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Phone Number (e.g., +919876543210)"
-              keyboardType="phone-pad"
-              value={phone}
-              onChangeText={setPhone}
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-            
-            <TouchableOpacity 
-              onPress={handleSendOtp}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <LinearGradient colors={THEME.gradients.primary} style={styles.button} start={{x: 0, y: 0}} end={{x: 1, y: 1}}>
-              {loading ? (
-                <ActivityIndicator color={THEME.colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>Send Verification Code</Text>
-              )}
-              </LinearGradient>
-            </TouchableOpacity>
+        <View style={styles.heroSection}>
+          <Text style={styles.title}>Welcome to CareCircle</Text>
+          <Text style={styles.subtitle}>Your all-in-one family caregiving companion</Text>
+        </View>
 
-            <TouchableOpacity style={styles.switchModeButton} onPress={() => setAuthMode('email-login')}>
-              <Text style={styles.switchModeText}>Continue with Email</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="Email Address"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              placeholderTextColor="#999"
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              placeholderTextColor="#999"
-            />
-
-            <TouchableOpacity 
-              onPress={handleEmailAuth}
-              disabled={emailAuthLoading}
-              activeOpacity={0.8}
-            >
-              <LinearGradient colors={THEME.gradients.primary} style={styles.button} start={{x: 0, y: 0}} end={{x: 1, y: 1}}>
-              {emailAuthLoading ? (
-                <ActivityIndicator color={THEME.colors.white} />
-              ) : (
-                <Text style={styles.buttonText}>{authMode === 'email-login' ? 'Sign In' : 'Sign Up'}</Text>
-              )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.switchModeButton} 
-              onPress={() => setAuthMode(authMode === 'email-login' ? 'email-register' : 'email-login')}
-            >
-              <Text style={styles.switchModeText}>
-                {authMode === 'email-login' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.switchModeButton} onPress={() => setAuthMode('phone')}>
-              <Text style={styles.switchModeText}>Continue with Phone</Text>
-            </TouchableOpacity>
-          </>
-        )}
+        <View style={styles.authCard}>
+          <Text style={styles.authLabel}>Enter your phone number to start</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Phone Number (e.g., +919876543210)"
+            keyboardType="phone-pad"
+            value={phone}
+            onChangeText={setPhone}
+            autoCapitalize="none"
+            placeholderTextColor="#999"
+          />
+          
+          <TouchableOpacity 
+            onPress={handleSendOtp}
+            disabled={loading}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Send Verification Code"
+          >
+            <LinearGradient colors={THEME.gradients.primary} style={styles.button} start={{x: 0, y: 0}} end={{x: 1, y: 1}}>
+            {loading ? (
+              <ActivityIndicator color={THEME.colors.white} />
+            ) : (
+              <Text style={styles.buttonText}>Send Verification Code</Text>
+            )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
         <View style={styles.dividerContainer}>
           <View style={styles.divider} />
@@ -289,6 +242,8 @@ const LoginScreen = ({ navigation }) => {
           style={styles.googleButton} 
           onPress={handleGoogleLogin}
           disabled={googleLoading}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Google"
         >
           {googleLoading ? (
             <ActivityIndicator color="#333" />
@@ -296,16 +251,84 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.googleButtonText}>Continue with Google</Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.switchModeButton} 
+          onPress={() => { setAuthMode('email-login'); setEmailModalVisible(true); }}
+          accessibilityRole="button"
+          accessibilityLabel="Continue with Email"
+        >
+          <Text style={styles.switchModeText}>Continue with Email</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      <Modal visible={langModalVisible} transparent={true} animationType="slide">
+      {/* Elegant Email Auth Modal */}
+      <Modal visible={emailModalVisible} transparent={true} animationType="slide">
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.emailModalContent}>
+            <Text style={styles.modalTitle}>{authMode === 'email-login' ? 'Sign In with Email' : 'Create Account'}</Text>
+            <Text style={styles.modalBody}>
+              {authMode === 'email-login' ? 'Enter your email and password to sign in' : 'Set up your email and password'}
+            </Text>
+
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Email Address"
+              keyboardType="email-address"
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              placeholderTextColor="#999"
+            />
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Password"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              placeholderTextColor="#999"
+            />
+
+            <TouchableOpacity 
+              onPress={handleEmailAuth}
+              disabled={emailAuthLoading}
+              activeOpacity={0.8}
+              style={{ width: '100%', marginBottom: 16 }}
+            >
+              <LinearGradient colors={THEME.gradients.primary} style={styles.button} start={{x: 0, y: 0}} end={{x: 1, y: 1}}>
+              {emailAuthLoading ? (
+                <ActivityIndicator color={THEME.colors.white} />
+              ) : (
+                <Text style={styles.buttonText}>{authMode === 'email-login' ? 'Sign In' : 'Sign Up'}</Text>
+              )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.modalSwitchBtn} 
+              onPress={() => setAuthMode(authMode === 'email-login' ? 'email-register' : 'email-login')}
+            >
+              <Text style={styles.switchModeText}>
+                {authMode === 'email-login' ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setEmailModalVisible(false)}>
+              <Text style={styles.modalCloseText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Polished Language Selection Modal */}
+      <Modal visible={langModalVisible} transparent={true} animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.langModalContent}>
             <Text style={styles.modalTitle}>Choose Language / भाषा चुनें</Text>
             <Text style={styles.modalBody}>
               Please select your preferred language. You can change this later in settings.
             </Text>
-            <ScrollView style={{ maxHeight: 300, width: '100%', marginBottom: 16 }}>
+            <ScrollView style={{ maxHeight: 340, width: '100%', marginBottom: 16 }}>
               {[
                 { code: 'en', label: 'English' },
                 { code: 'hi', label: 'हिन्दी (Hindi)' },
@@ -318,7 +341,7 @@ const LoginScreen = ({ navigation }) => {
               ].map(lang => (
                 <TouchableOpacity
                   key={lang.code}
-                  style={styles.langOptionBtn}
+                  style={styles.langCardBtn}
                   onPress={() => handleSelectLanguage(lang.code)}
                 >
                   <Text style={styles.langOptionText}>{lang.label}</Text>
@@ -328,7 +351,6 @@ const LoginScreen = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-
     </KeyboardAvoidingView>
   );
 };
@@ -340,14 +362,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: THEME.colors.canvas,
   },
+  heroSection: {
+    marginBottom: 40,
+    alignItems: 'center',
+  },
   title: {
     ...THEME.typography.header,
-    marginBottom: 8,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   subtitle: {
     ...THEME.typography.body,
     color: THEME.colors.textMuted,
-    marginBottom: 32,
+    textAlign: 'center',
+  },
+  authCard: {
+    backgroundColor: THEME.colors.cardBg,
+    borderRadius: THEME.borderRadius.card,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    ...THEME.shadows.medium,
+  },
+  authLabel: {
+    ...THEME.typography.label,
+    color: THEME.colors.textHeader,
+    marginBottom: 12,
   },
   input: {
     height: 56,
@@ -357,26 +397,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     marginBottom: 16,
-    backgroundColor: THEME.colors.cardBg,
+    backgroundColor: THEME.colors.canvas,
     color: THEME.colors.textBody,
-    ...THEME.shadows.soft,
+    fontFamily: 'Inter_500Medium',
   },
   button: {
     height: 56,
     borderRadius: THEME.borderRadius.button,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 48, // 48dp constraint
-    marginTop: 8,
+    minHeight: 48,
     ...THEME.shadows.medium,
   },
   buttonText: {
-    color: '#fff',
+    color: THEME.colors.white,
+    fontFamily: 'Inter_700Bold',
     fontSize: 16,
     fontWeight: '600',
   },
   switchModeButton: {
-    marginTop: 8,
+    marginTop: 16,
     alignItems: 'center',
     justifyContent: 'center',
     minHeight: 48,
@@ -384,6 +424,7 @@ const styles = StyleSheet.create({
   },
   switchModeText: {
     color: THEME.colors.primary,
+    fontFamily: 'Inter_700Bold',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -400,7 +441,8 @@ const styles = StyleSheet.create({
   dividerText: {
     marginHorizontal: 16,
     color: THEME.colors.textMuted,
-    fontWeight: '500',
+    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
   },
   googleButton: {
     backgroundColor: THEME.colors.cardBg,
@@ -411,20 +453,48 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: 48,
-    ...THEME.shadows.soft,
+    ...THEME.shadows.medium,
   },
   googleButtonText: {
-    color: '#333',
+    color: THEME.colors.textHeader,
+    fontFamily: 'Inter_700Bold',
     fontSize: 16,
     fontWeight: '600',
   },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { backgroundColor: '#fff', padding: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24, alignItems: 'center' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 8 },
-  modalBody: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
-  langOptionBtn: { padding: 16, width: '100%', borderBottomWidth: 1, borderBottomColor: '#eee', alignItems: 'center' },
-  langOptionText: { fontSize: 16, color: '#1A73E8', fontWeight: '500' }
+  emailModalContent: { backgroundColor: THEME.colors.cardBg, padding: 28, borderTopLeftRadius: 28, borderTopRightRadius: 28, alignItems: 'center' },
+  langModalContent: { backgroundColor: THEME.colors.cardBg, padding: 28, borderTopLeftRadius: 28, borderTopRightRadius: 28, alignItems: 'center', maxHeight: '80%' },
+  modalTitle: { ...THEME.typography.cardTitle, marginBottom: 8, textAlign: 'center' },
+  modalBody: { ...THEME.typography.body, color: THEME.colors.textMuted, textAlign: 'center', marginBottom: 24 },
+  modalInput: {
+    height: 56,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    borderRadius: THEME.borderRadius.button,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    marginBottom: 16,
+    backgroundColor: THEME.colors.canvas,
+    color: THEME.colors.textBody,
+    fontFamily: 'Inter_500Medium',
+  },
+  modalSwitchBtn: { minHeight: 48, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  modalCloseBtn: { minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  modalCloseText: { color: THEME.colors.textMuted, fontFamily: 'Inter_700Bold', fontSize: 14 },
+  langCardBtn: { 
+    padding: 16, 
+    width: '100%', 
+    backgroundColor: THEME.colors.canvas, 
+    borderRadius: 16, 
+    marginBottom: 12, 
+    alignItems: 'center', 
+    minHeight: 56,
+    borderWidth: 1,
+    borderColor: THEME.colors.border,
+    justifyContent: 'center'
+  },
+  langOptionText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: THEME.colors.primary, fontWeight: '700' }
 });
 
 export default LoginScreen;
-

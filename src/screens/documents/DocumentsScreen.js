@@ -8,7 +8,7 @@ import { getDoctorVisits } from '../../services/doctorVisitApi';
 import { useStore } from '../../store/useStore';
 import { THEME } from '../../styles/theme';
 import { useFocusEffect } from '@react-navigation/native';
-import { FileText, Trash2, Download, Tag, Sparkles } from 'lucide-react-native';
+import { FileText, Trash2, Download, Tag, Sparkles, ArrowLeft } from 'lucide-react-native';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 const CATEGORIES = ['Prescription', 'Reports', 'Medicines', 'Bills'];
@@ -186,7 +186,7 @@ const DocumentsScreen = ({ navigation }) => {
     <SafeAreaView style={styles.safeArea}>
       <BlurView intensity={90} tint="light" style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backText}>←</Text>
+          <ArrowLeft size={24} color={THEME.colors.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Document Hub</Text>
         <View style={{ width: 40 }} />
@@ -303,9 +303,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: THEME.colors.border
   },
-  backBtn: { padding: 8 },
+  backBtn: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
   backText: { fontSize: 24, color: THEME.colors.primary },
-  headerTitle: { ...THEME.typography.header, fontSize: 20 },
+  headerTitle: { ...THEME.typography.header, fontSize: 22, color: THEME.colors.textHeader },
   tabsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   tagContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 4, backgroundColor: THEME.colors.primary + '10', alignSelf: 'flex-start', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   visitTag: { fontSize: 11, color: THEME.colors.primary, fontWeight: '600' },
   docActions: { flexDirection: 'row', marginLeft: 12 },
-  actionBtn: { padding: 8, marginLeft: 4 },
+  actionBtn: { minWidth: 48, minHeight: 48, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
   fab: {
     position: 'absolute',
     bottom: 24,
